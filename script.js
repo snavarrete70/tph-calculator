@@ -119,7 +119,6 @@ function createWorkflowRows() {
               aria-label="${name} completed"
             />
           </td>
-          <td class="weighted-cell">0.00</td>
         </tr>
       `,
     )
@@ -153,7 +152,6 @@ function calculateTotals() {
 
   for (const row of rows) {
     const completedInput = row.querySelector(".completed-input");
-    const weightedCell = row.querySelector(".weighted-cell");
 
     const completed = Number(completedInput.value || 0);
     const rowIndex = Number(row.dataset.rowIndex);
@@ -168,7 +166,6 @@ function calculateTotals() {
     }
 
     const rowWeightedUnits = completed * weight;
-    weightedCell.textContent = formatNumber(rowWeightedUnits);
     rawTasks += completed;
     weightedUnits += rowWeightedUnits;
   }
@@ -256,9 +253,7 @@ resetButton.addEventListener("click", () => {
   const rows = workflowBody.querySelectorAll("tr");
   for (const row of rows) {
     const completedInput = row.querySelector(".completed-input");
-    const weightedCell = row.querySelector(".weighted-cell");
     completedInput.value = "";
-    weightedCell.textContent = "0.00";
   }
   setResult("Your weighted TPH will appear here.");
   hoursPartInput.focus();
