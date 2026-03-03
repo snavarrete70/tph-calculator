@@ -43,7 +43,25 @@ const totalHoursInput = document.getElementById("total-hours");
 const timeHoursMinutesGroup = document.getElementById("time-hours-minutes");
 const timeTotalMinutesGroup = document.getElementById("time-total-minutes");
 const timeTotalHoursGroup = document.getElementById("time-total-hours");
-const workflowSections = document.getElementById("workflow-sections");
+let workflowSections = document.getElementById("workflow-sections");
+
+if (!workflowSections) {
+  const actions = form.querySelector(".actions");
+  const legacyWrap = form.querySelector(".table-wrap.workflow-wrap");
+  workflowSections = document.createElement("div");
+  workflowSections.id = "workflow-sections";
+  workflowSections.className = "workflow-sections";
+
+  if (legacyWrap) {
+    legacyWrap.remove();
+  }
+
+  if (actions) {
+    form.insertBefore(workflowSections, actions);
+  } else {
+    form.appendChild(workflowSections);
+  }
+}
 const resultBox = document.getElementById("result");
 const resetButton = document.getElementById("reset");
 const historyBody = document.getElementById("history-body");
