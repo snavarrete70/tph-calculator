@@ -52,11 +52,15 @@
 
           <div class="actions">
             <button type="submit">Calculate Weighted TPH</button>
+            <button type="button" id="estimate-time" class="secondary">Estimate Time Needed</button>
             <button type="button" id="reset" class="secondary">Reset</button>
           </div>
         </form>
 
         <div id="result" class="result" aria-live="polite">Your weighted TPH will appear here.</div>
+        <div id="time-needed" class="result secondary-result" aria-live="polite">
+          Time needed at 12 TPH will appear here.
+        </div>
 
         <section class="history" aria-labelledby="history-title">
           <div class="history-header">

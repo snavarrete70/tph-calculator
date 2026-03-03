@@ -62,15 +62,47 @@ if (!workflowSections) {
     form.appendChild(workflowSections);
   }
 }
+
 const resultBox = document.getElementById("result");
 const resetButton = document.getElementById("reset");
 const historyBody = document.getElementById("history-body");
 const downloadCsvButton = document.getElementById("download-csv");
+let estimateTimeButton = document.getElementById("estimate-time");
+let timeNeededBox = document.getElementById("time-needed");
 const historyEntries = [];
+
+if (!estimateTimeButton) {
+  const actions = form.querySelector(".actions");
+  if (actions) {
+    estimateTimeButton = document.createElement("button");
+    estimateTimeButton.type = "button";
+    estimateTimeButton.id = "estimate-time";
+    estimateTimeButton.className = "secondary";
+    estimateTimeButton.textContent = "Estimate Time Needed";
+    actions.insertBefore(estimateTimeButton, resetButton || null);
+  }
+}
+
+if (!timeNeededBox && resultBox?.parentNode) {
+  timeNeededBox = document.createElement("div");
+  timeNeededBox.id = "time-needed";
+  timeNeededBox.className = "result secondary-result";
+  timeNeededBox.setAttribute("aria-live", "polite");
+  timeNeededBox.textContent = "Time needed at 12 TPH will appear here.";
+  resultBox.parentNode.insertBefore(timeNeededBox, resultBox.nextSibling);
+}
 
 function setResult(message, isError = false) {
   resultBox.textContent = message;
   resultBox.classList.toggle("error", isError);
+}
+
+function setTimeNeeded(message, isError = false) {
+  if (!timeNeededBox) {
+    return;
+  }
+  timeNeededBox.textContent = message;
+  timeNeededBox.classList.toggle("error", isError);
 }
 
 function toCsvValue(value) {
@@ -79,6 +111,13 @@ function toCsvValue(value) {
 
 function formatNumber(value) {
   return Number(value).toFixed(2);
+}
+
+function formatHoursMinutes(totalHours) {
+  const totalMinutes = Math.max(0, Math.round(totalHours * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h ${minutes}m`;
 }
 
 function setTimeMode(mode) {
@@ -222,6 +261,18 @@ function calculateTotals() {
   return { rawTasks, weightedUnits };
 }
 
+function renderTimeNeeded(totals) {
+  if (totals.rawTasks <= 0) {
+    setTimeNeeded("Enter case counts to estimate required time at 12 TPH.", true);
+    return;
+  }
+
+  const neededHours = totals.weightedUnits / targetTphPerHour;
+  setTimeNeeded(
+    `Time needed at ${targetTphPerHour} TPH: ${formatHoursMinutes(neededHours)} (${formatNumber(neededHours)} hours) for ${formatNumber(totals.rawTasks)} tasks.`,
+  );
+}
+
 downloadCsvButton.addEventListener("click", () => {
   if (historyEntries.length === 0) {
     return;
@@ -248,6 +299,17 @@ downloadCsvButton.addEventListener("click", () => {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 });
+
+if (estimateTimeButton) {
+  estimateTimeButton.addEventListener("click", () => {
+    const totals = calculateTotals();
+    if (totals.error) {
+      setTimeNeeded(totals.error, true);
+      return;
+    }
+    renderTimeNeeded(totals);
+  });
+}
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -276,6 +338,7 @@ form.addEventListener("submit", (event) => {
   setResult(
     `Weighted TPH: ${weightedTphFormatted} | Raw Tasks: ${formatNumber(totals.rawTasks)} | Weighted Units: ${formatNumber(totals.weightedUnits)}`,
   );
+  renderTimeNeeded(totals);
 
   historyEntries.unshift({
     time: new Date().toLocaleString(),
@@ -333,6 +396,7 @@ resetButton.addEventListener("click", () => {
 
   renderWorkflowSections();
   setResult("Your weighted TPH will appear here.");
+  setTimeNeeded(`Time needed at ${targetTphPerHour} TPH will appear here.`);
   hoursPartInput.focus();
 });
 

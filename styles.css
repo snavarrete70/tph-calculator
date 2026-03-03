@@ -336,3 +336,8 @@ button:disabled {
     max-width: none;
   }
 }
+
+.secondary-result {
+  margin-top: 8px;
+  background: #f3f9f8;
+}
