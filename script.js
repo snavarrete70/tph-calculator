@@ -1,34 +1,36 @@
-const workflowNames = [
-  "Backlog CAP",
-  "Daily CAP",
-  "eIDV Precision",
-  "dIDV Precision",
-  "Same Face",
-  "eIDV",
-  "dIDV",
-  "IDV Web Based",
-  "P2P Taxonomy",
-  "Cash in Taxonomy",
-  "P2P",
-  "P2P FR",
-  "Cash In Blocks",
-  "Instrument Link Blocks Secondaries",
-  "Referrals/ Incentives Blocked",
-  "Referrals/ Incentives Paid",
-  "CCFR Secondaries",
-  "CC General Secondaries",
-  "Gov Funds Secondaries",
-  "ACH Secondaries",
-  "Wires",
-  "PMD Secondaries",
-  "$Pay",
+const workflowDefinitions = [
+  { name: "Backlog CAP", minutes: 10, bucket: "identity" },
+  { name: "Daily CAP", minutes: 10, bucket: "identity" },
+  { name: "eIDV Precision", minutes: 10, bucket: "identity" },
+  { name: "dIDV Precision", minutes: 10, bucket: "identity" },
+  { name: "Same Face", minutes: 10, bucket: "identity" },
+  { name: "eIDV", minutes: 6, bucket: "identity" },
+  { name: "dIDV", minutes: 7, bucket: "identity" },
+  { name: "IDV Web Based", minutes: 12, bucket: "identity" },
+  { name: "P2P Taxonomy", minutes: 12, bucket: "chargebacks" },
+  { name: "Cash in Taxonomy", minutes: 12, bucket: "chargebacks" },
+  { name: "P2P", minutes: 10, bucket: "chargebacks" },
+  { name: "P2P FR", minutes: 12, bucket: "chargebacks" },
+  { name: "Cash In Blocks", minutes: 10, bucket: "chargebacks" },
+  { name: "Instrument Link Blocks Secondaries", minutes: 10, bucket: "chargebacks" },
+  { name: "Referrals/ Incentives Blocked", minutes: 8, bucket: "chargebacks" },
+  { name: "Referrals/ Incentives Paid", minutes: 8, bucket: "chargebacks" },
+  { name: "CCFR Secondaries", minutes: 16, bucket: "banking" },
+  { name: "CC General Secondaries", minutes: 16, bucket: "banking" },
+  { name: "Gov Funds Secondaries", minutes: 6, bucket: "banking" },
+  { name: "ACH Secondaries", minutes: 6, bucket: "banking" },
+  { name: "Wires", minutes: 8, bucket: "banking" },
+  { name: "PMD Secondaries", minutes: 8, bucket: "banking" },
+  { name: "$Pay", minutes: 14, bucket: "banking" },
 ];
+
 const targetTphPerHour = 12;
-const workflowMinutesPerCase = [10, 10, 10, 10, 10, 6, 7, 12, 12, 12, 10, 12, 10, 10, 8, 8, 16, 16, 6, 6, 8, 8, 14];
-const workflowWeights = workflowMinutesPerCase.map((minutes) => (minutes * targetTphPerHour) / 60);
+const workflowWeights = workflowDefinitions.map((workflow) => (workflow.minutes * targetTphPerHour) / 60);
+const completedByWorkflow = workflowDefinitions.map(() => 0);
 
 const form = document.getElementById("tph-form");
 const timeModeInput = document.getElementById("time-mode");
+const bucketSelect = document.getElementById("bucket-select");
 const hoursPartInput = document.getElementById("hours-part");
 const minutesPartInput = document.getElementById("minutes-part");
 const totalMinutesInput = document.getElementById("total-minutes");
@@ -103,20 +105,22 @@ function getHoursWorked() {
   return { hours: totalHours };
 }
 
-function createWorkflowRows() {
-  const rows = workflowNames
+function createWorkflowRows(bucket) {
+  const rows = workflowDefinitions
+    .map((workflow, index) => ({ workflow, index }))
+    .filter((entry) => entry.workflow.bucket === bucket)
     .map(
-      (name, index) => `
+      ({ workflow, index }) => `
         <tr data-row-index="${index}">
-          <td>${name}</td>
+          <td>${workflow.name}</td>
           <td>
             <input
               class="small-input completed-input"
               type="number"
               min="0"
               step="1"
-              value="0"
-              aria-label="${name} completed"
+              value="${completedByWorkflow[index]}"
+              aria-label="${workflow.name} completed"
             />
           </td>
         </tr>
@@ -146,32 +150,25 @@ function renderHistory() {
 }
 
 function calculateTotals() {
-  const rows = workflowBody.querySelectorAll("tr");
   let rawTasks = 0;
   let weightedUnits = 0;
 
-  for (const row of rows) {
-    const completedInput = row.querySelector(".completed-input");
-
-    const completed = Number(completedInput.value || 0);
-    const rowIndex = Number(row.dataset.rowIndex);
-    const weight = workflowWeights[rowIndex];
+  for (let index = 0; index < workflowDefinitions.length; index += 1) {
+    const completed = Number(completedByWorkflow[index] || 0);
+    const weight = workflowWeights[index];
 
     if (!Number.isFinite(completed) || !Number.isFinite(weight)) {
       return { error: "Please enter valid numbers in all workflow rows." };
     }
-
     if (!Number.isInteger(completed)) {
       return { error: "Completed values must be whole numbers." };
     }
-
     if (completed < 0 || weight < 0) {
       return { error: "Completed values and weights cannot be negative." };
     }
 
-    const rowWeightedUnits = completed * weight;
     rawTasks += completed;
-    weightedUnits += rowWeightedUnits;
+    weightedUnits += completed * weight;
   }
 
   return { rawTasks, weightedUnits };
@@ -247,6 +244,26 @@ timeModeInput.addEventListener("change", () => {
   setTimeMode(timeModeInput.value);
 });
 
+bucketSelect.addEventListener("change", () => {
+  createWorkflowRows(bucketSelect.value);
+});
+
+workflowBody.addEventListener("input", (event) => {
+  const input = event.target.closest(".completed-input");
+  if (!input) {
+    return;
+  }
+
+  const row = input.closest("tr");
+  if (!row) {
+    return;
+  }
+
+  const rowIndex = Number(row.dataset.rowIndex);
+  const nextValue = Number(input.value || 0);
+  completedByWorkflow[rowIndex] = Number.isFinite(nextValue) ? nextValue : 0;
+});
+
 workflowBody.addEventListener("focusin", (event) => {
   const input = event.target.closest(".completed-input");
   if (!input) {
@@ -265,15 +282,16 @@ resetButton.addEventListener("click", () => {
   minutesPartInput.value = "";
   totalMinutesInput.value = "";
   totalHoursInput.value = "";
-  const rows = workflowBody.querySelectorAll("tr");
-  for (const row of rows) {
-    const completedInput = row.querySelector(".completed-input");
-    completedInput.value = "0";
+
+  for (let index = 0; index < completedByWorkflow.length; index += 1) {
+    completedByWorkflow[index] = 0;
   }
+
+  createWorkflowRows(bucketSelect.value);
   setResult("Your weighted TPH will appear here.");
   hoursPartInput.focus();
 });
 
-createWorkflowRows();
+createWorkflowRows(bucketSelect.value);
 renderHistory();
 setTimeMode(timeModeInput.value);

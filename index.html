@@ -11,17 +11,28 @@
       <section class="card">
         <div class="notice-banner">Internal use only - do not share this link outside Foundations.</div>
         <h1>Foundations TPH Calculator</h1>
-        <p class="subtitle">
-          Enter completed counts for each workflow to calculate weighted TPH.
-        </p>
+        <p class="subtitle">Select a bucket, enter completed counts, and calculate weighted TPH.</p>
 
         <form id="tph-form" novalidate>
-          <label for="time-mode">Time Entry Type</label>
-          <select id="time-mode" name="time-mode">
-            <option value="hours-minutes">Hours + Minutes</option>
-            <option value="total-minutes">Total Minutes</option>
-            <option value="total-hours">Total Hours</option>
-          </select>
+          <div class="controls-grid">
+            <div class="control-block">
+              <label for="time-mode">Time Entry Type</label>
+              <select id="time-mode" name="time-mode">
+                <option value="hours-minutes">Hours + Minutes</option>
+                <option value="total-minutes">Total Minutes</option>
+                <option value="total-hours">Total Hours</option>
+              </select>
+            </div>
+
+            <div class="control-block">
+              <label for="bucket-select">Workflow Bucket</label>
+              <select id="bucket-select" name="bucket-select">
+                <option value="identity">Identity</option>
+                <option value="chargebacks">Chargebacks</option>
+                <option value="banking">Banking</option>
+              </select>
+            </div>
+          </div>
 
           <div id="time-hours-minutes" class="time-group">
             <div class="time-input-grid">
@@ -64,9 +75,7 @@
           </div>
         </form>
 
-        <div id="result" class="result" aria-live="polite">
-          Your weighted TPH will appear here.
-        </div>
+        <div id="result" class="result" aria-live="polite">Your weighted TPH will appear here.</div>
 
         <section class="history" aria-labelledby="history-title">
           <div class="history-header">
@@ -93,9 +102,7 @@
           </div>
         </section>
 
-        <p class="hint">
-          Formula: <strong>Weighted TPH = Sum(Completed x Weight) / Hours Worked</strong>
-        </p>
+        <p class="hint">Formula: <strong>Weighted TPH = Sum(Completed x Weight) / Hours Worked</strong></p>
         <p class="hint">Weights are based on workflow minutes per case and a target of 12 TPH.</p>
       </section>
     </main>
