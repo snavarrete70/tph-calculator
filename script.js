@@ -115,19 +115,9 @@ function createWorkflowRows() {
               type="number"
               min="0"
               step="0.01"
-              value="0"
+              value=""
+              placeholder="0"
               aria-label="${name} completed"
-            />
-          </td>
-          <td>
-            <input
-              class="small-input weight-input"
-              type="number"
-              min="0"
-              step="0.01"
-              value="${workflowWeights[index].toFixed(2)}"
-              readonly
-              aria-label="${name} weight"
             />
           </td>
           <td class="weighted-cell">0.00</td>
@@ -164,11 +154,11 @@ function calculateTotals() {
 
   for (const row of rows) {
     const completedInput = row.querySelector(".completed-input");
-    const weightInput = row.querySelector(".weight-input");
     const weightedCell = row.querySelector(".weighted-cell");
 
-    const completed = Number(completedInput.value);
-    const weight = Number(weightInput.value);
+    const completed = Number(completedInput.value || 0);
+    const rowIndex = Number(row.dataset.rowIndex);
+    const weight = workflowWeights[rowIndex];
 
     if (!Number.isFinite(completed) || !Number.isFinite(weight)) {
       return { error: "Please enter valid numbers in all workflow rows." };
@@ -268,7 +258,7 @@ resetButton.addEventListener("click", () => {
   for (const row of rows) {
     const completedInput = row.querySelector(".completed-input");
     const weightedCell = row.querySelector(".weighted-cell");
-    completedInput.value = "0";
+    completedInput.value = "";
     weightedCell.textContent = "0.00";
   }
   setResult("Your weighted TPH will appear here.");
