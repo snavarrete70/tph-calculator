@@ -116,7 +116,6 @@ function createWorkflowRows() {
               min="0"
               step="0.01"
               value=""
-              placeholder="0"
               aria-label="${name} completed"
             />
           </td>
