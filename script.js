@@ -114,8 +114,8 @@ function createWorkflowRows() {
               class="small-input completed-input"
               type="number"
               min="0"
-              step="0.01"
-              value=""
+              step="1"
+              value="0"
               aria-label="${name} completed"
             />
           </td>
@@ -159,6 +159,10 @@ function calculateTotals() {
 
     if (!Number.isFinite(completed) || !Number.isFinite(weight)) {
       return { error: "Please enter valid numbers in all workflow rows." };
+    }
+
+    if (!Number.isInteger(completed)) {
+      return { error: "Completed values must be whole numbers." };
     }
 
     if (completed < 0 || weight < 0) {
@@ -243,6 +247,17 @@ timeModeInput.addEventListener("change", () => {
   setTimeMode(timeModeInput.value);
 });
 
+workflowBody.addEventListener("focusin", (event) => {
+  const input = event.target.closest(".completed-input");
+  if (!input) {
+    return;
+  }
+
+  if (input.value === "0") {
+    input.select();
+  }
+});
+
 resetButton.addEventListener("click", () => {
   timeModeInput.value = "hours-minutes";
   setTimeMode(timeModeInput.value);
@@ -253,7 +268,7 @@ resetButton.addEventListener("click", () => {
   const rows = workflowBody.querySelectorAll("tr");
   for (const row of rows) {
     const completedInput = row.querySelector(".completed-input");
-    completedInput.value = "";
+    completedInput.value = "0";
   }
   setResult("Your weighted TPH will appear here.");
   hoursPartInput.focus();

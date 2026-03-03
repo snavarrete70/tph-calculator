@@ -278,3 +278,16 @@ td {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Ensure completed input spinner arrows are visible */
+.completed-input {
+  appearance: auto;
+  -moz-appearance: number-input;
+}
+
+.completed-input::-webkit-outer-spin-button,
+.completed-input::-webkit-inner-spin-button {
+  -webkit-appearance: auto;
+  margin: 0;
+  opacity: 1;
+}
