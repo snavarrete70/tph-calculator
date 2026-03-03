@@ -11,7 +11,7 @@
       <section class="card">
         <div class="notice-banner">Internal use only - do not share this link outside Foundations.</div>
         <h1>Foundations TPH Calculator</h1>
-        <p class="subtitle">Select a bucket, enter completed counts, and calculate weighted TPH.</p>
+        <p class="subtitle">Expand a bucket, enter completed counts, and calculate weighted TPH.</p>
 
         <form id="tph-form" novalidate>
           <div class="controls-grid">
@@ -21,15 +21,6 @@
                 <option value="hours-minutes">Hours + Minutes</option>
                 <option value="total-minutes">Total Minutes</option>
                 <option value="total-hours">Total Hours</option>
-              </select>
-            </div>
-
-            <div class="control-block">
-              <label for="bucket-select">Workflow Bucket</label>
-              <select id="bucket-select" name="bucket-select">
-                <option value="identity">Identity</option>
-                <option value="chargebacks">Chargebacks</option>
-                <option value="banking">Banking</option>
               </select>
             </div>
           </div>
@@ -57,17 +48,7 @@
             <input id="total-hours" type="number" min="0" step="0.01" placeholder="e.g. 8.5" />
           </div>
 
-          <div class="table-wrap workflow-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Workflow</th>
-                  <th>Completed</th>
-                </tr>
-              </thead>
-              <tbody id="workflow-body"></tbody>
-            </table>
-          </div>
+          <div id="workflow-sections" class="workflow-sections"></div>
 
           <div class="actions">
             <button type="submit">Calculate Weighted TPH</button>

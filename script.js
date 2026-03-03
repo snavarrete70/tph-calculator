@@ -1,3 +1,9 @@
+const bucketDefinitions = [
+  { id: "identity", label: "Identity" },
+  { id: "chargebacks", label: "Chargebacks" },
+  { id: "banking", label: "Banking" },
+];
+
 const workflowDefinitions = [
   { name: "Backlog CAP", minutes: 10, bucket: "identity" },
   { name: "Daily CAP", minutes: 10, bucket: "identity" },
@@ -9,7 +15,7 @@ const workflowDefinitions = [
   { name: "IDV Web Based", minutes: 12, bucket: "identity" },
   { name: "P2P Taxonomy", minutes: 12, bucket: "chargebacks" },
   { name: "Cash in Taxonomy", minutes: 12, bucket: "chargebacks" },
-  { name: "P2P", minutes: 10, bucket: "chargebacks" },
+  { name: "P2P Secondaries", minutes: 10, bucket: "chargebacks" },
   { name: "P2P FR", minutes: 12, bucket: "chargebacks" },
   { name: "Cash In Blocks", minutes: 10, bucket: "chargebacks" },
   { name: "Instrument Link Blocks Secondaries", minutes: 10, bucket: "chargebacks" },
@@ -30,7 +36,6 @@ const completedByWorkflow = workflowDefinitions.map(() => 0);
 
 const form = document.getElementById("tph-form");
 const timeModeInput = document.getElementById("time-mode");
-const bucketSelect = document.getElementById("bucket-select");
 const hoursPartInput = document.getElementById("hours-part");
 const minutesPartInput = document.getElementById("minutes-part");
 const totalMinutesInput = document.getElementById("total-minutes");
@@ -38,7 +43,7 @@ const totalHoursInput = document.getElementById("total-hours");
 const timeHoursMinutesGroup = document.getElementById("time-hours-minutes");
 const timeTotalMinutesGroup = document.getElementById("time-total-minutes");
 const timeTotalHoursGroup = document.getElementById("time-total-hours");
-const workflowBody = document.getElementById("workflow-body");
+const workflowSections = document.getElementById("workflow-sections");
 const resultBox = document.getElementById("result");
 const resetButton = document.getElementById("reset");
 const historyBody = document.getElementById("history-body");
@@ -105,10 +110,10 @@ function getHoursWorked() {
   return { hours: totalHours };
 }
 
-function createWorkflowRows(bucket) {
-  const rows = workflowDefinitions
+function renderRowsForBucket(bucketId) {
+  return workflowDefinitions
     .map((workflow, index) => ({ workflow, index }))
-    .filter((entry) => entry.workflow.bucket === bucket)
+    .filter((entry) => entry.workflow.bucket === bucketId)
     .map(
       ({ workflow, index }) => `
         <tr data-row-index="${index}">
@@ -127,8 +132,33 @@ function createWorkflowRows(bucket) {
       `,
     )
     .join("");
+}
 
-  workflowBody.innerHTML = rows;
+function renderWorkflowSections() {
+  const sections = bucketDefinitions
+    .map(
+      (bucket, index) => `
+        <details class="bucket-panel" ${index === 0 ? "open" : ""}>
+          <summary>${bucket.label}</summary>
+          <div class="table-wrap workflow-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Workflow</th>
+                  <th>Completed</th>
+                </tr>
+              </thead>
+              <tbody data-bucket="${bucket.id}">
+                ${renderRowsForBucket(bucket.id)}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      `,
+    )
+    .join("");
+
+  workflowSections.innerHTML = sections;
 }
 
 function renderHistory() {
@@ -244,11 +274,7 @@ timeModeInput.addEventListener("change", () => {
   setTimeMode(timeModeInput.value);
 });
 
-bucketSelect.addEventListener("change", () => {
-  createWorkflowRows(bucketSelect.value);
-});
-
-workflowBody.addEventListener("input", (event) => {
+workflowSections.addEventListener("input", (event) => {
   const input = event.target.closest(".completed-input");
   if (!input) {
     return;
@@ -264,7 +290,7 @@ workflowBody.addEventListener("input", (event) => {
   completedByWorkflow[rowIndex] = Number.isFinite(nextValue) ? nextValue : 0;
 });
 
-workflowBody.addEventListener("focusin", (event) => {
+workflowSections.addEventListener("focusin", (event) => {
   const input = event.target.closest(".completed-input");
   if (!input) {
     return;
@@ -287,11 +313,11 @@ resetButton.addEventListener("click", () => {
     completedByWorkflow[index] = 0;
   }
 
-  createWorkflowRows(bucketSelect.value);
+  renderWorkflowSections();
   setResult("Your weighted TPH will appear here.");
   hoursPartInput.focus();
 });
 
-createWorkflowRows(bucketSelect.value);
+renderWorkflowSections();
 renderHistory();
 setTimeMode(timeModeInput.value);

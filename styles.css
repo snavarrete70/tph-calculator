@@ -72,7 +72,7 @@ form {
 
 .controls-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(220px, 260px));
+  grid-template-columns: minmax(220px, 260px);
   gap: 10px;
   align-items: end;
 }
@@ -126,16 +126,61 @@ select:focus {
   max-width: 170px;
 }
 
-.table-wrap {
+.workflow-sections {
   margin-top: 4px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow-x: auto;
-  background: #fbfcff;
+  display: grid;
+  gap: 8px;
 }
 
-.workflow-wrap {
-  max-height: 350px;
+.bucket-panel {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fbfcff;
+  overflow: hidden;
+}
+
+.bucket-panel summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 10px 12px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #243556;
+  background: #f2f5fc;
+  border-bottom: 1px solid transparent;
+}
+
+.bucket-panel[open] summary {
+  border-bottom-color: #e5ebf6;
+}
+
+.bucket-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.bucket-panel summary::before {
+  content: "+";
+  display: inline-block;
+  width: 14px;
+  margin-right: 8px;
+  font-weight: 700;
+}
+
+.bucket-panel[open] summary::before {
+  content: "-";
+}
+
+.table-wrap {
+  border: 0;
+  border-radius: 0;
+  overflow-x: auto;
+  background: transparent;
+}
+
+.history .table-wrap {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fbfcff;
 }
 
 table {
