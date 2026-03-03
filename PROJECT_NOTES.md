@@ -31,7 +31,7 @@ The calculator includes these workflows:
 - Cash in Taxonomy
 - P2P
 - P2P FR
-- Cash In Blocks
+- Cash In Blocks Secondaries
 - Instrument Link Blocks Secondaries
 - Referrals/ Incentives Blocked
 - Referrals/ Incentives Paid

@@ -17,7 +17,7 @@ const workflowDefinitions = [
   { name: "Cash in Taxonomy", minutes: 12, bucket: "chargebacks" },
   { name: "P2P Secondaries", minutes: 10, bucket: "chargebacks" },
   { name: "P2P FR", minutes: 12, bucket: "chargebacks" },
-  { name: "Cash In Blocks", minutes: 10, bucket: "chargebacks" },
+  { name: "Cash In Blocks Secondaries", minutes: 10, bucket: "chargebacks" },
   { name: "Instrument Link Blocks Secondaries", minutes: 10, bucket: "chargebacks" },
   { name: "Referrals/ Incentives Blocked", minutes: 8, bucket: "chargebacks" },
   { name: "Referrals/ Incentives Paid", minutes: 8, bucket: "chargebacks" },
