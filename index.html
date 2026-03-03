@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TPH Calculator</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <section class="card">
+        <h1>Weighted TPH Calculator</h1>
+        <p class="subtitle">
+          Enter completed counts for each workflow and set each workflow's weight to calculate weighted TPH.
+        </p>
+
+        <form id="tph-form" novalidate>
+          <label for="time-mode">Time Entry Type</label>
+          <select id="time-mode" name="time-mode">
+            <option value="hours-minutes">Hours + Minutes</option>
+            <option value="total-minutes">Total Minutes</option>
+            <option value="total-hours">Total Hours</option>
+          </select>
+
+          <div id="time-hours-minutes" class="time-group">
+            <div class="time-input-grid">
+              <div>
+                <label for="hours-part">Hours</label>
+                <input id="hours-part" type="number" min="0" step="1" placeholder="e.g. 8" />
+              </div>
+              <div>
+                <label for="minutes-part">Minutes</label>
+                <input id="minutes-part" type="number" min="0" max="59" step="1" placeholder="e.g. 30" />
+              </div>
+            </div>
+          </div>
+
+          <div id="time-total-minutes" class="time-group" hidden>
+            <label for="total-minutes">Total Minutes Worked</label>
+            <input id="total-minutes" type="number" min="0" step="1" placeholder="e.g. 510" />
+          </div>
+
+          <div id="time-total-hours" class="time-group" hidden>
+            <label for="total-hours">Total Hours Worked</label>
+            <input id="total-hours" type="number" min="0" step="0.01" placeholder="e.g. 8.5" />
+          </div>
+
+          <div class="table-wrap workflow-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Workflow</th>
+                  <th>Completed</th>
+                  <th>Weight</th>
+                  <th>Weighted Units</th>
+                </tr>
+              </thead>
+              <tbody id="workflow-body"></tbody>
+            </table>
+          </div>
+
+          <div class="actions">
+            <button type="submit">Calculate Weighted TPH</button>
+            <button type="button" id="reset" class="secondary">Reset</button>
+          </div>
+        </form>
+
+        <div id="result" class="result" aria-live="polite">
+          Your weighted TPH will appear here.
+        </div>
+
+        <section class="history" aria-labelledby="history-title">
+          <div class="history-header">
+            <h2 id="history-title">Calculation History</h2>
+            <button type="button" id="download-csv" class="secondary" disabled>Download CSV</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Raw Tasks</th>
+                  <th>Weighted Units</th>
+                  <th>Hours</th>
+                  <th>Weighted TPH</th>
+                </tr>
+              </thead>
+              <tbody id="history-body">
+                <tr>
+                  <td colspan="5" class="empty">No calculations yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <p class="hint">
+          Formula: <strong>Weighted TPH = Sum(Completed x Weight) / Hours Worked</strong>
+        </p>
+        <p class="hint">Weights are based on workflow minutes per case and a target of 12 TPH.</p>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
