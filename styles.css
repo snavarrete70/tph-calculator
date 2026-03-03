@@ -216,3 +216,65 @@ button:disabled {
   font-size: 0.9rem;
   font-weight: 600;
 }
+
+/* Compact layout refinements */
+form {
+  gap: 8px;
+}
+
+select:focus {
+  outline: 2px solid #99f6e4;
+  border-color: var(--primary);
+}
+
+#time-mode {
+  max-width: 260px;
+}
+
+#time-total-minutes input,
+#time-total-hours input {
+  max-width: 180px;
+}
+
+.time-input-grid {
+  grid-template-columns: repeat(2, minmax(120px, 180px));
+  justify-content: start;
+}
+
+.time-input-grid > div {
+  max-width: 180px;
+}
+
+.workflow-wrap table {
+  table-layout: fixed;
+}
+
+.workflow-wrap th:last-child,
+.workflow-wrap td:last-child {
+  width: 140px;
+}
+
+.workflow-wrap .small-input {
+  width: 100%;
+  max-width: 120px;
+  min-width: 0;
+}
+
+th,
+td {
+  padding: 8px 10px;
+}
+
+@media (max-width: 640px) {
+  #time-mode,
+  #time-total-minutes input,
+  #time-total-hours input,
+  .time-input-grid > div,
+  .workflow-wrap .small-input {
+    max-width: none;
+  }
+
+  .time-input-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
