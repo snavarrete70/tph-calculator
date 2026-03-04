@@ -78,12 +78,14 @@ label {
 }
 
 input,
+textarea,
 select,
 button {
   font: inherit;
 }
 
 input,
+textarea,
 select {
   width: 100%;
   padding: 8px 10px;
@@ -94,6 +96,7 @@ select {
 }
 
 input:focus,
+textarea:focus,
 select:focus {
   outline: 2px solid #9deee2;
   border-color: var(--primary);
@@ -115,7 +118,7 @@ select:focus {
 .import-grid {
   margin-top: 8px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -434,7 +437,20 @@ button:disabled {
 
   #time-total-minutes input,
   #time-total-hours input,
-  .small-input {
+  .small-input,
+  #assignment-text {
     max-width: none;
   }
+}
+
+#import-status.error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+#assignment-text {
+  min-height: 130px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }

@@ -61,8 +61,7 @@ const minutesPartInput = document.getElementById("minutes-part");
 const totalMinutesInput = document.getElementById("total-minutes");
 const totalHoursInput = document.getElementById("total-hours");
 const agentNameInput = document.getElementById("agent-name");
-const sheetUrlInput = document.getElementById("sheet-url");
-const scriptEndpointInput = document.getElementById("script-endpoint");
+const assignmentTextInput = document.getElementById("assignment-text");
 const importAssignmentsButton = document.getElementById("import-assignments");
 const clearImportButton = document.getElementById("clear-import");
 const importStatusBox = document.getElementById("import-status");
@@ -172,8 +171,7 @@ function persistState() {
     completedByWorkflow,
     dayHours,
     agentName: agentNameInput?.value || "",
-    sheetUrl: sheetUrlInput?.value || "",
-    endpointUrl: scriptEndpointInput?.value || "",
+    assignmentText: assignmentTextInput?.value || "",
     timeMode: timeModeInput?.value || "hours-minutes",
     hoursPart: hoursPartInput?.value || "",
     minutesPart: minutesPartInput?.value || "",
@@ -210,11 +208,8 @@ function loadPersistedState() {
   if (agentNameInput && typeof state.agentName === "string") {
     agentNameInput.value = state.agentName;
   }
-  if (sheetUrlInput && typeof state.sheetUrl === "string") {
-    sheetUrlInput.value = state.sheetUrl;
-  }
-  if (scriptEndpointInput && typeof state.endpointUrl === "string") {
-    scriptEndpointInput.value = state.endpointUrl;
+  if (assignmentTextInput && typeof state.assignmentText === "string") {
+    assignmentTextInput.value = state.assignmentText;
   }
 
   if (typeof state.timeMode === "string") {
@@ -777,101 +772,40 @@ function parseCsvLine(line) {
 
 function parseCsvAssignments(csvText) {
   const lines = csvText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
+    .split("\n")
+    .map((line) => line.replace(/\r/g, "").trim())
     .filter((line) => line.length > 0);
 
-  if (lines.length < 2) {
-    throw new Error("Sheet needs a header row and at least one data row.");
+  if (lines.length === 0) {
+    throw new Error("Assignment text is empty.");
   }
 
-  const header = parseCsvLine(lines[0]).map((cell) => cell.toLowerCase());
-  const workflowCol = header.findIndex((cell) => cell.includes("workflow"));
-  const casesCol = header.findIndex((cell) => cell.includes("case") || cell.includes("assigned"));
+  let startIndex = 0;
+  let workflowCol = 0;
+  let casesCol = 1;
 
-  if (workflowCol < 0 || casesCol < 0) {
-    throw new Error("Sheet must include columns like Workflow and Assigned Cases.");
+  const firstRow = parseCsvLine(lines[0]);
+  const headerLower = firstRow.map((cell) => cell.toLowerCase());
+  const detectedWorkflow = headerLower.findIndex((cell) => cell.includes("workflow"));
+  const detectedCases = headerLower.findIndex((cell) => cell.includes("case") || cell.includes("assigned"));
+
+  if (detectedWorkflow >= 0 && detectedCases >= 0) {
+    startIndex = 1;
+    workflowCol = detectedWorkflow;
+    casesCol = detectedCases;
   }
 
-  return lines.slice(1).map((line) => {
+  if (lines.length <= startIndex) {
+    throw new Error("Add at least one assignment row.");
+  }
+
+  return lines.slice(startIndex).map((line) => {
     const columns = parseCsvLine(line);
     return {
       workflow: columns[workflowCol] || "",
       cases: Number(columns[casesCol] || 0),
     };
   });
-}
-
-function parseSheetUrl(sheetUrl) {
-  const idMatch = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  if (!idMatch) {
-    return null;
-  }
-
-  const gidMatch = sheetUrl.match(/[?&#]gid=(\d+)/);
-  return {
-    sheetId: idMatch[1],
-    gid: gidMatch ? gidMatch[1] : "0",
-  };
-}
-
-async function fetchAssignmentsFromGoogleSheet(sheetUrl) {
-  const parsed = parseSheetUrl(sheetUrl);
-  if (!parsed) {
-    throw new Error("Invalid Google Sheet URL.");
-  }
-
-  const csvUrl = `https://docs.google.com/spreadsheets/d/${parsed.sheetId}/export?format=csv&gid=${parsed.gid}`;
-  const response = await fetch(csvUrl);
-  if (!response.ok) {
-    throw new Error("Could not read sheet. Ensure the sheet is shared for viewer access.");
-  }
-
-  const csvText = await response.text();
-  return parseCsvAssignments(csvText);
-}
-
-async function fetchAssignmentsFromEndpoint(endpointUrl, payload) {
-  const requestBody = JSON.stringify(payload);
-
-  let response;
-  try {
-    // Use text/plain body to avoid CORS preflight issues in browser clients.
-    response = await fetch(endpointUrl, {
-      method: "POST",
-      body: requestBody,
-    });
-  } catch (error) {
-    throw new Error("Endpoint network request failed. Check the Apps Script deployment access and URL.");
-  }
-
-  if (!response.ok) {
-    throw new Error(`Endpoint request failed (${response.status}).`);
-  }
-
-  const raw = await response.text();
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch (error) {
-    throw new Error("Endpoint response was not valid JSON.");
-  }
-
-  if (Array.isArray(data.assignments)) {
-    return data.assignments;
-  }
-  if (Array.isArray(data.rows)) {
-    return data.rows;
-  }
-  if (Array.isArray(data)) {
-    return data;
-  }
-
-  if (data && data.error) {
-    throw new Error(String(data.error));
-  }
-
-  throw new Error("Endpoint response must include an assignments array.");
 }
 
 function applyAssignments(assignments) {
@@ -911,36 +845,32 @@ function applyAssignments(assignments) {
 
 async function importAssignments() {
   const agentName = agentNameInput?.value.trim() || "";
-  const sheetUrl = sheetUrlInput?.value.trim() || "";
-  const endpointUrl = scriptEndpointInput?.value.trim() || "";
+  const assignmentText = assignmentTextInput?.value || "";
 
   if (!agentName) {
     setImportStatus("Enter agent name before importing.", true);
     return;
   }
 
-  if (!sheetUrl) {
-    setImportStatus("Enter a Google Sheet URL before importing.", true);
+  if (!assignmentText.trim()) {
+    setImportStatus("Paste assignment rows before importing.", true);
     return;
   }
 
-  setImportStatus("Importing assignment sheet...");
+  setImportStatus("Applying assignment text...");
 
   try {
-    const assignments = endpointUrl
-      ? await fetchAssignmentsFromEndpoint(endpointUrl, { agentName, sheetUrl })
-      : await fetchAssignmentsFromGoogleSheet(sheetUrl);
-
+    const assignments = parseCsvAssignments(assignmentText);
     const summary = applyAssignments(assignments);
     const unmappedSuffix =
       summary.unmapped.length > 0
         ? ` Unmapped workflows: ${summary.unmapped.slice(0, 4).join(", ")}${summary.unmapped.length > 4 ? "..." : ""}.`
         : "";
 
-    setImportStatus(`Imported assignments for ${agentName}.${unmappedSuffix}`);
-    setResult("Assignments imported. Review values and run calculations.");
+    setImportStatus(`Applied assignments for ${agentName}.${unmappedSuffix}`);
+    setResult("Assignments applied. Review values and run calculations.");
   } catch (error) {
-    setImportStatus(error.message || "Import failed. Check sheet access or endpoint settings.", true);
+    setImportStatus(error.message || "Import failed. Verify each row uses Workflow, Cases format.", true);
   }
 
   persistState();
@@ -1079,7 +1009,7 @@ for (const day of dayHourInputs) {
   });
 }
 
-[agentNameInput, sheetUrlInput, scriptEndpointInput, hoursPartInput, minutesPartInput, totalMinutesInput, totalHoursInput].forEach(
+[agentNameInput, assignmentTextInput, hoursPartInput, minutesPartInput, totalMinutesInput, totalHoursInput].forEach(
   (input) => {
     input?.addEventListener("input", () => {
       persistState();
@@ -1109,7 +1039,7 @@ resetButton.addEventListener("click", () => {
   setResult("Your weighted TPH will appear here.");
   setTimeNeeded(`Time needed at ${targetTphPerHour} TPH will appear here.`);
   setPlanOutput("Weekly plan recommendations will appear here.");
-  setImportStatus("No assignment sheet imported yet.");
+  setImportStatus("No assignment text applied yet.");
   persistState();
   hoursPartInput.focus();
 });
@@ -1117,4 +1047,4 @@ resetButton.addEventListener("click", () => {
 renderWorkflowSections();
 renderHistory();
 setTimeMode(timeModeInput.value);
-setImportStatus("No assignment sheet imported yet.");
+setImportStatus("No assignment text applied yet.");
