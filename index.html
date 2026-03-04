@@ -53,36 +53,28 @@
           <section class="planner-section" aria-labelledby="planner-title">
             <h2 id="planner-title">Weekly Planning Assistant</h2>
             <p class="planner-note">
-              Enter available hours per day and the exact Daily CAP/Wires assignments by day.
+              Enter hours available and exact daily assignments. CAP/Wires values are used on their specific days.
             </p>
-            <div class="planner-grid">
-              <label class="planner-day" for="hours-mon">Mon<input id="hours-mon" type="number" min="0" step="0.5" placeholder="0" /></label>
-              <label class="planner-day" for="hours-tue">Tue<input id="hours-tue" type="number" min="0" step="0.5" placeholder="0" /></label>
-              <label class="planner-day" for="hours-wed">Wed<input id="hours-wed" type="number" min="0" step="0.5" placeholder="0" /></label>
-              <label class="planner-day" for="hours-thu">Thu<input id="hours-thu" type="number" min="0" step="0.5" placeholder="0" /></label>
-              <label class="planner-day" for="hours-fri">Fri<input id="hours-fri" type="number" min="0" step="0.5" placeholder="0" /></label>
-              <label class="planner-day" for="hours-sat">Sat<input id="hours-sat" type="number" min="0" step="0.5" placeholder="0" /></label>
-              <label class="planner-day" for="hours-sun">Sun<input id="hours-sun" type="number" min="0" step="0.5" placeholder="0" /></label>
-            </div>
-            <h3 class="planner-subtitle">Daily CAP Assignments</h3>
-            <div class="planner-grid">
-              <label class="planner-day" for="cap-mon">Mon<input id="cap-mon" type="number" min="0" step="1" placeholder="0" /></label>
-              <label class="planner-day" for="cap-tue">Tue<input id="cap-tue" type="number" min="0" step="1" placeholder="0" /></label>
-              <label class="planner-day" for="cap-wed">Wed<input id="cap-wed" type="number" min="0" step="1" placeholder="0" /></label>
-              <label class="planner-day" for="cap-thu">Thu<input id="cap-thu" type="number" min="0" step="1" placeholder="0" /></label>
-              <label class="planner-day" for="cap-fri">Fri<input id="cap-fri" type="number" min="0" step="1" placeholder="0" /></label>
-              <label class="planner-day" for="cap-sat">Sat<input id="cap-sat" type="number" min="0" step="1" placeholder="0" /></label>
-              <label class="planner-day" for="cap-sun">Sun<input id="cap-sun" type="number" min="0" step="1" placeholder="0" /></label>
-            </div>
-            <h3 class="planner-subtitle">Wires Assignments</h3>
-            <div class="planner-grid">
-              <label class="planner-day" for="wires-mon">Mon<input id="wires-mon" type="number" min="0" step="1" placeholder="0" /></label>
-              <label class="planner-day" for="wires-tue">Tue<input id="wires-tue" type="number" min="0" step="1" placeholder="0" /></label>
-              <label class="planner-day" for="wires-wed">Wed<input id="wires-wed" type="number" min="0" step="1" placeholder="0" /></label>
-              <label class="planner-day" for="wires-thu">Thu<input id="wires-thu" type="number" min="0" step="1" placeholder="0" /></label>
-              <label class="planner-day" for="wires-fri">Fri<input id="wires-fri" type="number" min="0" step="1" placeholder="0" /></label>
-              <label class="planner-day" for="wires-sat">Sat<input id="wires-sat" type="number" min="0" step="1" placeholder="0" /></label>
-              <label class="planner-day" for="wires-sun">Sun<input id="wires-sun" type="number" min="0" step="1" placeholder="0" /></label>
+            <div class="table-wrap planner-table-wrap">
+              <table class="planner-table">
+                <thead>
+                  <tr>
+                    <th>Day</th>
+                    <th>Hours Available</th>
+                    <th>Daily CAP Assigned</th>
+                    <th>Wires Assigned</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>Mon</td><td><input id="hours-mon" type="number" min="0" step="0.5" placeholder="0" /></td><td><input id="cap-mon" type="number" min="0" step="1" placeholder="0" /></td><td><input id="wires-mon" type="number" min="0" step="1" placeholder="0" /></td></tr>
+                  <tr><td>Tue</td><td><input id="hours-tue" type="number" min="0" step="0.5" placeholder="0" /></td><td><input id="cap-tue" type="number" min="0" step="1" placeholder="0" /></td><td><input id="wires-tue" type="number" min="0" step="1" placeholder="0" /></td></tr>
+                  <tr><td>Wed</td><td><input id="hours-wed" type="number" min="0" step="0.5" placeholder="0" /></td><td><input id="cap-wed" type="number" min="0" step="1" placeholder="0" /></td><td><input id="wires-wed" type="number" min="0" step="1" placeholder="0" /></td></tr>
+                  <tr><td>Thu</td><td><input id="hours-thu" type="number" min="0" step="0.5" placeholder="0" /></td><td><input id="cap-thu" type="number" min="0" step="1" placeholder="0" /></td><td><input id="wires-thu" type="number" min="0" step="1" placeholder="0" /></td></tr>
+                  <tr><td>Fri</td><td><input id="hours-fri" type="number" min="0" step="0.5" placeholder="0" /></td><td><input id="cap-fri" type="number" min="0" step="1" placeholder="0" /></td><td><input id="wires-fri" type="number" min="0" step="1" placeholder="0" /></td></tr>
+                  <tr><td>Sat</td><td><input id="hours-sat" type="number" min="0" step="0.5" placeholder="0" /></td><td><input id="cap-sat" type="number" min="0" step="1" placeholder="0" /></td><td><input id="wires-sat" type="number" min="0" step="1" placeholder="0" /></td></tr>
+                  <tr><td>Sun</td><td><input id="hours-sun" type="number" min="0" step="0.5" placeholder="0" /></td><td><input id="cap-sun" type="number" min="0" step="1" placeholder="0" /></td><td><input id="wires-sun" type="number" min="0" step="1" placeholder="0" /></td></tr>
+                </tbody>
+              </table>
             </div>
           </section>
 
