@@ -44,6 +44,7 @@ const targetTphPerHour = 12;
 const burnoutBufferRatio = 0.15;
 const maxBucketsPerDay = 2;
 const contextSwitchPenaltyMinutes = 20;
+const wednesdayIndex = 2;
 
 const workflowWeights = workflowDefinitions.map((workflow) => (workflow.minutes * targetTphPerHour) / 60);
 const completedByWorkflow = workflowDefinitions.map(() => 0);
@@ -225,6 +226,69 @@ function getDayHours() {
 function getBucketLabel(bucketId) {
   const bucket = bucketDefinitions.find((entry) => entry.id === bucketId);
   return bucket ? bucket.label : bucketId;
+}
+
+function isDailyDueWorkflow(name) {
+  return name === "Daily CAP" || name === "Wires";
+}
+
+function isWednesdayDueWorkflow(name) {
+  return name.includes("Secondaries");
+}
+
+function countActiveDays(dayHours, fromIndex, toIndex) {
+  let count = 0;
+  for (let index = fromIndex; index <= toIndex; index += 1) {
+    if (dayHours[index] && dayHours[index].hours > 0) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function ensureBucketFocus(bucketFocus, bucketId, minutesUsedRef, capacityMinutes) {
+  if (bucketFocus.includes(bucketId)) {
+    return true;
+  }
+
+  if (bucketFocus.length === 0) {
+    bucketFocus.push(bucketId);
+    return true;
+  }
+
+  if (bucketFocus.length >= maxBucketsPerDay) {
+    return false;
+  }
+
+  if (capacityMinutes - minutesUsedRef.value <= contextSwitchPenaltyMinutes) {
+    return false;
+  }
+
+  minutesUsedRef.value += contextSwitchPenaltyMinutes;
+  bucketFocus.push(bucketId);
+  return true;
+}
+
+function allocateRequiredCasesForWorkflow(index, requiredCases, remainingCases, allocation, minutesUsedRef, capacityMinutes, bucketFocus) {
+  const minutesPerCase = workflowDefinitions[index].minutes;
+  const bucketId = workflowDefinitions[index].bucket;
+
+  if (!ensureBucketFocus(bucketFocus, bucketId, minutesUsedRef, capacityMinutes)) {
+    return 0;
+  }
+
+  const capacityLeft = Math.max(0, Math.floor(capacityMinutes - minutesUsedRef.value));
+  const maxByCapacity = Math.floor(capacityLeft / minutesPerCase);
+  const casesToAllocate = Math.min(requiredCases, remainingCases[index], maxByCapacity);
+
+  if (casesToAllocate <= 0) {
+    return 0;
+  }
+
+  remainingCases[index] -= casesToAllocate;
+  allocation[index] = (allocation[index] || 0) + casesToAllocate;
+  minutesUsedRef.value += casesToAllocate * minutesPerCase;
+  return casesToAllocate;
 }
 
 function getRemainingMinutesForBucket(bucketId, remainingCases) {
@@ -473,46 +537,89 @@ function buildWeeklyPlan() {
     return;
   }
 
+  const dailyDueIndexes = workflowDefinitions
+    .map((workflow, index) => ({ workflow, index }))
+    .filter((entry) => isDailyDueWorkflow(entry.workflow.name))
+    .map((entry) => entry.index);
+
+  const wednesdayDueIndexes = workflowDefinitions
+    .map((workflow, index) => ({ workflow, index }))
+    .filter((entry) => isWednesdayDueWorkflow(entry.workflow.name))
+    .map((entry) => entry.index);
+
   const remainingCases = completedByWorkflow.map((value) => Number(value || 0));
   const dayPlans = [];
 
-  for (const day of dayHours) {
+  for (let dayIndex = 0; dayIndex < dayHours.length; dayIndex += 1) {
+    const day = dayHours[dayIndex];
     const dailyCapacityMinutes = day.hours * 60 * (1 - burnoutBufferRatio);
-    let minutesUsed = 0;
-    let switchPenaltyApplied = 0;
+    const minutesUsedRef = { value: 0 };
     const bucketFocus = [];
     const allocation = {};
 
-    for (let slot = 0; slot < maxBucketsPerDay; slot += 1) {
+    if (day.hours > 0) {
+      const remainingActiveDays = countActiveDays(dayHours, dayIndex, dayHours.length - 1);
+      if (remainingActiveDays > 0) {
+        for (const index of dailyDueIndexes) {
+          if (remainingCases[index] <= 0) {
+            continue;
+          }
+          const dailyQuota = Math.ceil(remainingCases[index] / remainingActiveDays);
+          allocateRequiredCasesForWorkflow(
+            index,
+            dailyQuota,
+            remainingCases,
+            allocation,
+            minutesUsedRef,
+            dailyCapacityMinutes,
+            bucketFocus,
+          );
+        }
+      }
+
+      if (dayIndex <= wednesdayIndex) {
+        const remainingWedDays = countActiveDays(dayHours, dayIndex, wednesdayIndex);
+        if (remainingWedDays > 0) {
+          for (const index of wednesdayDueIndexes) {
+            if (remainingCases[index] <= 0) {
+              continue;
+            }
+            const wedQuota = Math.ceil(remainingCases[index] / remainingWedDays);
+            allocateRequiredCasesForWorkflow(
+              index,
+              wedQuota,
+              remainingCases,
+              allocation,
+              minutesUsedRef,
+              dailyCapacityMinutes,
+              bucketFocus,
+            );
+          }
+        }
+      }
+    }
+
+    for (let slot = bucketFocus.length; slot < maxBucketsPerDay; slot += 1) {
       const bucketId = pickNextBucket(remainingCases, bucketFocus);
       if (!bucketId) {
         break;
       }
 
-      if (slot > 0) {
-        if (dailyCapacityMinutes - minutesUsed <= contextSwitchPenaltyMinutes) {
-          break;
-        }
-        minutesUsed += contextSwitchPenaltyMinutes;
-        switchPenaltyApplied += contextSwitchPenaltyMinutes;
+      if (!ensureBucketFocus(bucketFocus, bucketId, minutesUsedRef, dailyCapacityMinutes)) {
+        break;
       }
 
-      const capacityForCases = dailyCapacityMinutes - minutesUsed;
+      const capacityForCases = dailyCapacityMinutes - minutesUsedRef.value;
       if (capacityForCases <= 0) {
         break;
       }
 
       const allocationResult = allocateFromBucket(bucketId, remainingCases, capacityForCases);
       if (allocationResult.usedMinutes <= 0) {
-        if (slot > 0) {
-          minutesUsed -= contextSwitchPenaltyMinutes;
-          switchPenaltyApplied -= contextSwitchPenaltyMinutes;
-        }
         break;
       }
 
-      bucketFocus.push(bucketId);
-      minutesUsed += allocationResult.usedMinutes;
+      minutesUsedRef.value += allocationResult.usedMinutes;
 
       for (const [index, count] of Object.entries(allocationResult.allocation)) {
         allocation[index] = (allocation[index] || 0) + count;
@@ -520,14 +627,13 @@ function buildWeeklyPlan() {
     }
 
     const plannedCases = Object.values(allocation).reduce((sum, count) => sum + count, 0);
-    const utilization = day.hours > 0 ? (minutesUsed / (day.hours * 60)) * 100 : 0;
+    const utilization = day.hours > 0 ? (minutesUsedRef.value / (day.hours * 60)) * 100 : 0;
 
     dayPlans.push({
       ...day,
-      minutesUsed,
+      minutesUsed: minutesUsedRef.value,
       plannedCases,
       utilization,
-      switchPenaltyApplied,
       bucketFocus,
       allocation,
     });
@@ -539,13 +645,24 @@ function buildWeeklyPlan() {
     0,
   );
 
+  const remainingDailyDue = dailyDueIndexes.reduce((sum, index) => sum + remainingCases[index], 0);
+  const remainingWednesdayDue = wednesdayDueIndexes.reduce((sum, index) => sum + remainingCases[index], 0);
+
   const requiredHours = totals.weightedUnits / targetTphPerHour;
   const effectiveCapacityHours = totalAvailableHours * (1 - burnoutBufferRatio);
 
-  const statusLine =
+  let statusLine =
     remainingTaskCount > 0
       ? `<strong>Plan status:</strong> ${remainingTaskCount} cases (${formatNumber(remainingMinutes / 60)} hours) remain after this week's safe-capacity plan.`
       : "<strong>Plan status:</strong> All assigned cases can be completed within this week's plan.";
+
+  if (remainingWednesdayDue > 0) {
+    statusLine += ` <br /><strong>Deadline risk:</strong> ${remainingWednesdayDue} secondary cases remain beyond Wednesday.`;
+  }
+
+  if (remainingDailyDue > 0) {
+    statusLine += ` <br /><strong>Daily due risk:</strong> ${remainingDailyDue} Daily CAP/Wires cases could not be fully spread across daily capacity.`;
+  }
 
   const rows = dayPlans
     .map((day) => {
@@ -587,10 +704,10 @@ function buildWeeklyPlan() {
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <p class="planner-footnote">Planner logic: keeps a 15% daily buffer for burnout prevention and limits each day to at most 2 buckets with a context-switch penalty.</p>
+    <p class="planner-footnote">Planner logic: Daily CAP and Wires are treated as daily due; workflows with "Secondaries" are due by Wednesday. Planner keeps a 15% daily buffer and limits to at most 2 buckets/day.</p>
   `;
 
-  setPlanOutput(summaryHtml, remainingTaskCount > 0);
+  setPlanOutput(summaryHtml, remainingTaskCount > 0 || remainingWednesdayDue > 0 || remainingDailyDue > 0);
 }
 
 downloadCsvButton.addEventListener("click", () => {
