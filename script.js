@@ -41,9 +41,9 @@ const workflowDefinitions = [
 ];
 
 const targetTphPerHour = 12;
-const burnoutBufferRatio = 0.15;
+const burnoutBufferRatio = 0.10;
 const maxBucketsPerDay = 2;
-const contextSwitchPenaltyMinutes = 20;
+const contextSwitchPenaltyMinutes = 30;
 const wednesdayIndex = 2;
 
 const workflowWeights = workflowDefinitions.map((workflow) => (workflow.minutes * targetTphPerHour) / 60);
@@ -760,7 +760,7 @@ function buildWeeklyPlan() {
     <div class="plan-summary">
       <p><strong>Required time:</strong> ${formatHoursMinutes(requiredHours)} (${formatNumber(requiredHours)} hours)</p>
       <p><strong>Available time entered:</strong> ${formatNumber(totalAvailableHours)} hours</p>
-      <p><strong>Planning capacity (15% burnout buffer):</strong> ${formatNumber(effectiveCapacityHours)} hours</p>
+      <p><strong>Planning capacity (${formatNumber(burnoutBufferRatio * 100)}% burnout buffer):</strong> ${formatNumber(effectiveCapacityHours)} hours</p>
       <p>${statusLine}</p>
     </div>
     <div class="table-wrap plan-table-wrap">
