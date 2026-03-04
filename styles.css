@@ -35,7 +35,7 @@ body {
 
 .card {
   width: 100%;
-  max-width: 980px;
+  max-width: 940px;
   background: var(--card);
   border: 1px solid var(--card-border);
   border-radius: 18px;
@@ -70,6 +70,18 @@ form {
   gap: 10px;
 }
 
+.controls-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 260px);
+  gap: 10px;
+  align-items: end;
+}
+
+.control-block {
+  display: grid;
+  gap: 6px;
+}
+
 label {
   margin: 0;
   font-size: 0.86rem;
@@ -97,60 +109,6 @@ input:focus,
 select:focus {
   outline: 2px solid #9deee2;
   border-color: var(--primary);
-}
-
-.import-section {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px;
-  background: #f8fbff;
-}
-
-.import-section h2,
-.planner-section h2 {
-  margin: 0;
-  font-size: 0.98rem;
-}
-
-.import-grid {
-  margin-top: 8px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.import-grid label {
-  display: grid;
-  gap: 4px;
-}
-
-.import-actions {
-  margin-top: 8px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.import-status {
-  margin-top: 8px;
-  padding: 8px 10px;
-  border: 1px dashed var(--border);
-  border-radius: 8px;
-  background: #f2f7ff;
-  font-size: 0.86rem;
-  color: #32496f;
-}
-
-.controls-grid {
-  display: grid;
-  grid-template-columns: minmax(220px, 260px);
-  gap: 10px;
-  align-items: end;
-}
-
-.control-block {
-  display: grid;
-  gap: 6px;
 }
 
 .time-group {
@@ -218,6 +176,11 @@ select:focus {
   border-radius: 10px;
   padding: 10px;
   background: #f8fbff;
+}
+
+.planner-section h2 {
+  margin: 0;
+  font-size: 0.98rem;
 }
 
 .planner-note {
@@ -403,12 +366,6 @@ button:disabled {
   -webkit-appearance: auto;
   margin: 0;
   opacity: 1;
-}
-
-@media (max-width: 900px) {
-  .import-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 760px) {

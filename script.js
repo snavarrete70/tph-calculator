@@ -1,5 +1,3 @@
-const STORAGE_KEY = "tph-calculator-state-v1";
-
 const bucketDefinitions = [
   { id: "identity", label: "Identity" },
   { id: "chargebacks", label: "Chargebacks" },
@@ -50,9 +48,6 @@ const wednesdayIndex = 2;
 
 const workflowWeights = workflowDefinitions.map((workflow) => (workflow.minutes * targetTphPerHour) / 60);
 const completedByWorkflow = workflowDefinitions.map(() => 0);
-const workflowIndexByNormalized = new Map(
-  workflowDefinitions.map((workflow, index) => [normalizeWorkflowName(workflow.name), index]),
-);
 
 const form = document.getElementById("tph-form");
 const timeModeInput = document.getElementById("time-mode");
@@ -60,12 +55,6 @@ const hoursPartInput = document.getElementById("hours-part");
 const minutesPartInput = document.getElementById("minutes-part");
 const totalMinutesInput = document.getElementById("total-minutes");
 const totalHoursInput = document.getElementById("total-hours");
-const agentNameInput = document.getElementById("agent-name");
-const sheetUrlInput = document.getElementById("sheet-url");
-const scriptEndpointInput = document.getElementById("script-endpoint");
-const importAssignmentsButton = document.getElementById("import-assignments");
-const clearImportButton = document.getElementById("clear-import");
-const importStatusBox = document.getElementById("import-status");
 const timeHoursMinutesGroup = document.getElementById("time-hours-minutes");
 const timeTotalMinutesGroup = document.getElementById("time-total-minutes");
 const timeTotalHoursGroup = document.getElementById("time-total-hours");
@@ -93,20 +82,41 @@ const resultBox = document.getElementById("result");
 const resetButton = document.getElementById("reset");
 const historyBody = document.getElementById("history-body");
 const downloadCsvButton = document.getElementById("download-csv");
-const estimateTimeButton = document.getElementById("estimate-time");
-const buildPlanButton = document.getElementById("build-plan");
-const timeNeededBox = document.getElementById("time-needed");
-const planOutputBox = document.getElementById("plan-output");
+let estimateTimeButton = document.getElementById("estimate-time");
+let buildPlanButton = document.getElementById("build-plan");
+let timeNeededBox = document.getElementById("time-needed");
+let planOutputBox = document.getElementById("plan-output");
 const dayHourInputs = plannerDays.map((day) => ({ ...day, input: document.getElementById(`hours-${day.id}`) }));
 const historyEntries = [];
 
-loadPersistedState();
+if (!estimateTimeButton) {
+  const actions = form.querySelector(".actions");
+  if (actions) {
+    estimateTimeButton = document.createElement("button");
+    estimateTimeButton.type = "button";
+    estimateTimeButton.id = "estimate-time";
+    estimateTimeButton.className = "secondary";
+    estimateTimeButton.textContent = "Estimate Time Needed";
+    actions.insertBefore(estimateTimeButton, resetButton || null);
+  }
+}
 
-function normalizeWorkflowName(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
+if (!timeNeededBox && resultBox?.parentNode) {
+  timeNeededBox = document.createElement("div");
+  timeNeededBox.id = "time-needed";
+  timeNeededBox.className = "result secondary-result";
+  timeNeededBox.setAttribute("aria-live", "polite");
+  timeNeededBox.textContent = "Time needed at 12 TPH will appear here.";
+  resultBox.parentNode.insertBefore(timeNeededBox, resultBox.nextSibling);
+}
+
+if (!planOutputBox && resultBox?.parentNode) {
+  planOutputBox = document.createElement("div");
+  planOutputBox.id = "plan-output";
+  planOutputBox.className = "result secondary-result";
+  planOutputBox.setAttribute("aria-live", "polite");
+  planOutputBox.textContent = "Weekly plan recommendations will appear here.";
+  resultBox.parentNode.appendChild(planOutputBox);
 }
 
 function setResult(message, isError = false) {
@@ -115,21 +125,19 @@ function setResult(message, isError = false) {
 }
 
 function setTimeNeeded(message, isError = false) {
+  if (!timeNeededBox) {
+    return;
+  }
   timeNeededBox.textContent = message;
   timeNeededBox.classList.toggle("error", isError);
 }
 
 function setPlanOutput(html, isError = false) {
-  planOutputBox.innerHTML = html;
-  planOutputBox.classList.toggle("error", isError);
-}
-
-function setImportStatus(message, isError = false) {
-  if (!importStatusBox) {
+  if (!planOutputBox) {
     return;
   }
-  importStatusBox.textContent = message;
-  importStatusBox.classList.toggle("error", isError);
+  planOutputBox.innerHTML = html;
+  planOutputBox.classList.toggle("error", isError);
 }
 
 function toCsvValue(value) {
@@ -145,85 +153,6 @@ function formatHoursMinutes(totalHours) {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return `${hours}h ${minutes}m`;
-}
-
-function getPersistedState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-function persistState() {
-  const dayHours = {};
-  for (const day of dayHourInputs) {
-    if (!day.input) {
-      continue;
-    }
-    dayHours[day.id] = Number(day.input.value || 0);
-  }
-
-  const state = {
-    completedByWorkflow,
-    dayHours,
-    agentName: agentNameInput?.value || "",
-    sheetUrl: sheetUrlInput?.value || "",
-    endpointUrl: scriptEndpointInput?.value || "",
-    timeMode: timeModeInput?.value || "hours-minutes",
-    hoursPart: hoursPartInput?.value || "",
-    minutesPart: minutesPartInput?.value || "",
-    totalMinutes: totalMinutesInput?.value || "",
-    totalHours: totalHoursInput?.value || "",
-  };
-
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
-
-function loadPersistedState() {
-  const state = getPersistedState();
-  if (!state) {
-    return;
-  }
-
-  if (Array.isArray(state.completedByWorkflow)) {
-    for (let i = 0; i < completedByWorkflow.length; i += 1) {
-      const value = Number(state.completedByWorkflow[i] || 0);
-      completedByWorkflow[i] = Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
-    }
-  }
-
-  if (state.dayHours) {
-    for (const day of dayHourInputs) {
-      if (!day.input) {
-        continue;
-      }
-      const value = Number(state.dayHours[day.id] || 0);
-      day.input.value = Number.isFinite(value) && value > 0 ? String(value) : "";
-    }
-  }
-
-  if (agentNameInput && typeof state.agentName === "string") {
-    agentNameInput.value = state.agentName;
-  }
-  if (sheetUrlInput && typeof state.sheetUrl === "string") {
-    sheetUrlInput.value = state.sheetUrl;
-  }
-  if (scriptEndpointInput && typeof state.endpointUrl === "string") {
-    scriptEndpointInput.value = state.endpointUrl;
-  }
-
-  if (typeof state.timeMode === "string") {
-    timeModeInput.value = state.timeMode;
-  }
-  hoursPartInput.value = state.hoursPart || "";
-  minutesPartInput.value = state.minutesPart || "";
-  totalMinutesInput.value = state.totalMinutes || "";
-  totalHoursInput.value = state.totalHours || "";
 }
 
 function setTimeMode(mode) {
@@ -281,7 +210,9 @@ function getDayHours() {
       continue;
     }
 
-    const value = Number(day.input.value || 0);
+    const rawValue = day.input.value;
+    const value = Number(rawValue || 0);
+
     if (!Number.isFinite(value) || value < 0) {
       return { error: `Invalid available hours for ${day.label}.` };
     }
@@ -617,23 +548,25 @@ function buildWeeklyPlan() {
     const bucketFocus = [];
     const allocation = {};
 
-    if (day.hours > 0 && dayIndex <= wednesdayIndex) {
-      const remainingWedDays = countActiveDays(dayHours, dayIndex, wednesdayIndex);
-      if (remainingWedDays > 0) {
-        for (const index of wednesdayDueIndexes) {
-          if (remainingCases[index] <= 0) {
-            continue;
+    if (day.hours > 0) {
+      if (dayIndex <= wednesdayIndex) {
+        const remainingWedDays = countActiveDays(dayHours, dayIndex, wednesdayIndex);
+        if (remainingWedDays > 0) {
+          for (const index of wednesdayDueIndexes) {
+            if (remainingCases[index] <= 0) {
+              continue;
+            }
+            const wedQuota = Math.ceil(remainingCases[index] / remainingWedDays);
+            allocateRequiredCasesForWorkflow(
+              index,
+              wedQuota,
+              remainingCases,
+              allocation,
+              minutesUsedRef,
+              dailyCapacityMinutes,
+              bucketFocus,
+            );
           }
-          const wedQuota = Math.ceil(remainingCases[index] / remainingWedDays);
-          allocateRequiredCasesForWorkflow(
-            index,
-            wedQuota,
-            remainingCases,
-            allocation,
-            minutesUsedRef,
-            dailyCapacityMinutes,
-            bucketFocus,
-          );
         }
       }
     }
@@ -683,7 +616,6 @@ function buildWeeklyPlan() {
     (sum, count, index) => sum + count * workflowDefinitions[index].minutes,
     0,
   );
-
   const remainingWednesdayDue = wednesdayDueIndexes.reduce((sum, index) => sum + remainingCases[index], 0);
 
   const requiredHours = totals.weightedUnits / targetTphPerHour;
@@ -695,7 +627,7 @@ function buildWeeklyPlan() {
       : "<strong>Plan status:</strong> All assigned cases can be completed within this week's plan.";
 
   if (remainingWednesdayDue > 0) {
-    statusLine += ` <br /><strong>Deadline risk:</strong> ${remainingWednesdayDue} workflows ending with \"Secondaries\" remain beyond Wednesday.`;
+    statusLine += ` <br /><strong>Deadline risk:</strong> ${remainingWednesdayDue} secondary cases remain beyond Wednesday.`;
   }
 
   const rows = dayPlans
@@ -738,194 +670,10 @@ function buildWeeklyPlan() {
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <p class="planner-footnote">Planner logic: workflows ending in "Secondaries" are due by Wednesday. Daily CAP and Wires are treated as bulk weekly intake split flexibly across your available days. Planner keeps a 15% daily buffer and limits to at most 2 buckets/day.</p>
+    <p class="planner-footnote">Planner logic: workflows ending in "Secondaries" are due by Wednesday. Daily CAP and Wires are treated as bulk weekly intake that can be split flexibly day-to-day. Planner keeps a 15% daily buffer and limits to at most 2 buckets/day.</p>
   `;
 
   setPlanOutput(summaryHtml, remainingTaskCount > 0 || remainingWednesdayDue > 0);
-}
-
-function parseCsvLine(line) {
-  const values = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i += 1) {
-    const char = line[i];
-
-    if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (char === "," && !inQuotes) {
-      values.push(current);
-      current = "";
-      continue;
-    }
-
-    current += char;
-  }
-
-  values.push(current);
-  return values.map((value) => value.trim());
-}
-
-function parseCsvAssignments(csvText) {
-  const lines = csvText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  if (lines.length < 2) {
-    throw new Error("Sheet needs a header row and at least one data row.");
-  }
-
-  const header = parseCsvLine(lines[0]).map((cell) => cell.toLowerCase());
-  const workflowCol = header.findIndex((cell) => cell.includes("workflow"));
-  const casesCol = header.findIndex((cell) => cell.includes("case") || cell.includes("assigned"));
-
-  if (workflowCol < 0 || casesCol < 0) {
-    throw new Error("Sheet must include columns like Workflow and Assigned Cases.");
-  }
-
-  return lines.slice(1).map((line) => {
-    const columns = parseCsvLine(line);
-    return {
-      workflow: columns[workflowCol] || "",
-      cases: Number(columns[casesCol] || 0),
-    };
-  });
-}
-
-function parseSheetUrl(sheetUrl) {
-  const idMatch = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  if (!idMatch) {
-    return null;
-  }
-
-  const gidMatch = sheetUrl.match(/[?&#]gid=(\d+)/);
-  return {
-    sheetId: idMatch[1],
-    gid: gidMatch ? gidMatch[1] : "0",
-  };
-}
-
-async function fetchAssignmentsFromGoogleSheet(sheetUrl) {
-  const parsed = parseSheetUrl(sheetUrl);
-  if (!parsed) {
-    throw new Error("Invalid Google Sheet URL.");
-  }
-
-  const csvUrl = `https://docs.google.com/spreadsheets/d/${parsed.sheetId}/export?format=csv&gid=${parsed.gid}`;
-  const response = await fetch(csvUrl);
-  if (!response.ok) {
-    throw new Error("Could not read sheet. Ensure the sheet is shared for viewer access.");
-  }
-
-  const csvText = await response.text();
-  return parseCsvAssignments(csvText);
-}
-
-async function fetchAssignmentsFromEndpoint(endpointUrl, payload) {
-  const response = await fetch(endpointUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Endpoint request failed (${response.status}).`);
-  }
-
-  const data = await response.json();
-  if (Array.isArray(data.assignments)) {
-    return data.assignments;
-  }
-  if (Array.isArray(data.rows)) {
-    return data.rows;
-  }
-  if (Array.isArray(data)) {
-    return data;
-  }
-
-  throw new Error("Endpoint response must include an assignments array.");
-}
-
-function applyAssignments(assignments) {
-  const nextValues = workflowDefinitions.map(() => 0);
-  const unmapped = [];
-
-  for (const row of assignments) {
-    const workflowName = row.workflow || row.name || row.Workflow || "";
-    const casesValue = Number(row.cases ?? row.assignedCases ?? row.count ?? row.Cases ?? 0);
-
-    if (!workflowName) {
-      continue;
-    }
-
-    const normalized = normalizeWorkflowName(workflowName);
-    const index = workflowIndexByNormalized.get(normalized);
-
-    if (index === undefined) {
-      unmapped.push(workflowName);
-      continue;
-    }
-
-    if (Number.isFinite(casesValue) && casesValue >= 0) {
-      nextValues[index] += Math.floor(casesValue);
-    }
-  }
-
-  for (let index = 0; index < completedByWorkflow.length; index += 1) {
-    completedByWorkflow[index] = nextValues[index];
-  }
-
-  renderWorkflowSections();
-  persistState();
-
-  return { unmapped, mappedCount: nextValues.reduce((sum, value) => sum + (value > 0 ? 1 : 0), 0) };
-}
-
-async function importAssignments() {
-  const agentName = agentNameInput?.value.trim() || "";
-  const sheetUrl = sheetUrlInput?.value.trim() || "";
-  const endpointUrl = scriptEndpointInput?.value.trim() || "";
-
-  if (!agentName) {
-    setImportStatus("Enter agent name before importing.", true);
-    return;
-  }
-
-  if (!sheetUrl) {
-    setImportStatus("Enter a Google Sheet URL before importing.", true);
-    return;
-  }
-
-  setImportStatus("Importing assignment sheet...");
-
-  try {
-    const assignments = endpointUrl
-      ? await fetchAssignmentsFromEndpoint(endpointUrl, { agentName, sheetUrl })
-      : await fetchAssignmentsFromGoogleSheet(sheetUrl);
-
-    const summary = applyAssignments(assignments);
-    const unmappedSuffix =
-      summary.unmapped.length > 0
-        ? ` Unmapped workflows: ${summary.unmapped.slice(0, 4).join(", ")}${summary.unmapped.length > 4 ? "..." : ""}.`
-        : "";
-
-    setImportStatus(`Imported assignments for ${agentName}.${unmappedSuffix}`);
-    setResult("Assignments imported. Review values and run calculations.");
-  } catch (error) {
-    setImportStatus(error.message || "Import failed. Check sheet access or endpoint settings.", true);
-  }
-
-  persistState();
 }
 
 downloadCsvButton.addEventListener("click", () => {
@@ -955,31 +703,22 @@ downloadCsvButton.addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
-estimateTimeButton?.addEventListener("click", () => {
-  const totals = calculateTotals();
-  if (totals.error) {
-    setTimeNeeded(totals.error, true);
-    return;
-  }
-  renderTimeNeeded(totals);
-});
+if (estimateTimeButton) {
+  estimateTimeButton.addEventListener("click", () => {
+    const totals = calculateTotals();
+    if (totals.error) {
+      setTimeNeeded(totals.error, true);
+      return;
+    }
+    renderTimeNeeded(totals);
+  });
+}
 
-buildPlanButton?.addEventListener("click", () => {
-  buildWeeklyPlan();
-});
-
-importAssignmentsButton?.addEventListener("click", () => {
-  importAssignments();
-});
-
-clearImportButton?.addEventListener("click", () => {
-  for (let i = 0; i < completedByWorkflow.length; i += 1) {
-    completedByWorkflow[i] = 0;
-  }
-  renderWorkflowSections();
-  persistState();
-  setImportStatus("Imported case values cleared.");
-});
+if (buildPlanButton) {
+  buildPlanButton.addEventListener("click", () => {
+    buildWeeklyPlan();
+  });
+}
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -1019,12 +758,10 @@ form.addEventListener("submit", (event) => {
   });
 
   renderHistory();
-  persistState();
 });
 
 timeModeInput.addEventListener("change", () => {
   setTimeMode(timeModeInput.value);
-  persistState();
 });
 
 workflowSections.addEventListener("input", (event) => {
@@ -1040,8 +777,7 @@ workflowSections.addEventListener("input", (event) => {
 
   const rowIndex = Number(row.dataset.rowIndex);
   const nextValue = Number(input.value || 0);
-  completedByWorkflow[rowIndex] = Number.isFinite(nextValue) ? Math.max(0, Math.floor(nextValue)) : 0;
-  persistState();
+  completedByWorkflow[rowIndex] = Number.isFinite(nextValue) ? nextValue : 0;
 });
 
 workflowSections.addEventListener("focusin", (event) => {
@@ -1054,20 +790,6 @@ workflowSections.addEventListener("focusin", (event) => {
     input.select();
   }
 });
-
-for (const day of dayHourInputs) {
-  day.input?.addEventListener("input", () => {
-    persistState();
-  });
-}
-
-[agentNameInput, sheetUrlInput, scriptEndpointInput, hoursPartInput, minutesPartInput, totalMinutesInput, totalHoursInput].forEach(
-  (input) => {
-    input?.addEventListener("input", () => {
-      persistState();
-    });
-  },
-);
 
 resetButton.addEventListener("click", () => {
   timeModeInput.value = "hours-minutes";
@@ -1091,12 +813,9 @@ resetButton.addEventListener("click", () => {
   setResult("Your weighted TPH will appear here.");
   setTimeNeeded(`Time needed at ${targetTphPerHour} TPH will appear here.`);
   setPlanOutput("Weekly plan recommendations will appear here.");
-  setImportStatus("No assignment sheet imported yet.");
-  persistState();
   hoursPartInput.focus();
 });
 
 renderWorkflowSections();
 renderHistory();
 setTimeMode(timeModeInput.value);
-setImportStatus("No assignment sheet imported yet.");
