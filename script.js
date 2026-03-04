@@ -832,17 +832,31 @@ async function fetchAssignmentsFromGoogleSheet(sheetUrl) {
 }
 
 async function fetchAssignmentsFromEndpoint(endpointUrl, payload) {
-  const response = await fetch(endpointUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const requestBody = JSON.stringify(payload);
+
+  let response;
+  try {
+    // Use text/plain body to avoid CORS preflight issues in browser clients.
+    response = await fetch(endpointUrl, {
+      method: "POST",
+      body: requestBody,
+    });
+  } catch (error) {
+    throw new Error("Endpoint network request failed. Check the Apps Script deployment access and URL.");
+  }
 
   if (!response.ok) {
     throw new Error(`Endpoint request failed (${response.status}).`);
   }
 
-  const data = await response.json();
+  const raw = await response.text();
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (error) {
+    throw new Error("Endpoint response was not valid JSON.");
+  }
+
   if (Array.isArray(data.assignments)) {
     return data.assignments;
   }
@@ -851,6 +865,10 @@ async function fetchAssignmentsFromEndpoint(endpointUrl, payload) {
   }
   if (Array.isArray(data)) {
     return data;
+  }
+
+  if (data && data.error) {
+    throw new Error(String(data.error));
   }
 
   throw new Error("Endpoint response must include an assignments array.");
