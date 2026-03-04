@@ -232,6 +232,10 @@ function isWednesdayDueWorkflow(name) {
   return /Secondaries$/i.test(name.trim());
 }
 
+function isDailyPortionWorkflow(name) {
+  return name === "Daily CAP" || name === "Wires";
+}
+
 function countActiveDays(dayHours, fromIndex, toIndex) {
   let count = 0;
   for (let index = fromIndex; index <= toIndex; index += 1) {
@@ -533,6 +537,11 @@ function buildWeeklyPlan() {
     return;
   }
 
+  const dailyDueIndexes = workflowDefinitions
+    .map((workflow, index) => ({ workflow, index }))
+    .filter((entry) => isDailyPortionWorkflow(entry.workflow.name))
+    .map((entry) => entry.index);
+
   const wednesdayDueIndexes = workflowDefinitions
     .map((workflow, index) => ({ workflow, index }))
     .filter((entry) => isWednesdayDueWorkflow(entry.workflow.name))
@@ -549,6 +558,25 @@ function buildWeeklyPlan() {
     const allocation = {};
 
     if (day.hours > 0) {
+      const remainingActiveDays = countActiveDays(dayHours, dayIndex, dayHours.length - 1);
+      if (remainingActiveDays > 0) {
+        for (const index of dailyDueIndexes) {
+          if (remainingCases[index] <= 0) {
+            continue;
+          }
+          const dailyQuota = Math.ceil(remainingCases[index] / remainingActiveDays);
+          allocateRequiredCasesForWorkflow(
+            index,
+            dailyQuota,
+            remainingCases,
+            allocation,
+            minutesUsedRef,
+            dailyCapacityMinutes,
+            bucketFocus,
+          );
+        }
+      }
+
       if (dayIndex <= wednesdayIndex) {
         const remainingWedDays = countActiveDays(dayHours, dayIndex, wednesdayIndex);
         if (remainingWedDays > 0) {
@@ -616,6 +644,7 @@ function buildWeeklyPlan() {
     (sum, count, index) => sum + count * workflowDefinitions[index].minutes,
     0,
   );
+  const remainingDailyDue = dailyDueIndexes.reduce((sum, index) => sum + remainingCases[index], 0);
   const remainingWednesdayDue = wednesdayDueIndexes.reduce((sum, index) => sum + remainingCases[index], 0);
 
   const requiredHours = totals.weightedUnits / targetTphPerHour;
@@ -628,6 +657,10 @@ function buildWeeklyPlan() {
 
   if (remainingWednesdayDue > 0) {
     statusLine += ` <br /><strong>Deadline risk:</strong> ${remainingWednesdayDue} secondary cases remain beyond Wednesday.`;
+  }
+
+  if (remainingDailyDue > 0) {
+    statusLine += ` <br /><strong>Daily portion risk:</strong> ${remainingDailyDue} Daily CAP/Wires cases remain after daily planning.`;
   }
 
   const rows = dayPlans
@@ -670,12 +703,11 @@ function buildWeeklyPlan() {
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <p class="planner-footnote">Planner logic: workflows ending in "Secondaries" are due by Wednesday. Daily CAP and Wires are treated as bulk weekly intake that can be split flexibly day-to-day. Planner keeps a 15% daily buffer and limits to at most 2 buckets/day.</p>
+    <p class="planner-footnote">Planner logic: Daily CAP and Wires are allocated as daily portions first, workflows ending in "Secondaries" are due by Wednesday, then remaining work is optimized. Planner keeps a 15% daily buffer and limits to at most 2 buckets/day.</p>
   `;
 
-  setPlanOutput(summaryHtml, remainingTaskCount > 0 || remainingWednesdayDue > 0);
+  setPlanOutput(summaryHtml, remainingTaskCount > 0 || remainingWednesdayDue > 0 || remainingDailyDue > 0);
 }
-
 downloadCsvButton.addEventListener("click", () => {
   if (historyEntries.length === 0) {
     return;
