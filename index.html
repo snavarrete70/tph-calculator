@@ -50,9 +50,26 @@
 
           <div id="workflow-sections" class="workflow-sections"></div>
 
+          <section class="planner-section" aria-labelledby="planner-title">
+            <h2 id="planner-title">Weekly Planning Assistant</h2>
+            <p class="planner-note">
+              Enter available hours per day. Planner uses your current workflow case counts as assigned load.
+            </p>
+            <div class="planner-grid">
+              <label class="planner-day" for="hours-mon">Mon<input id="hours-mon" type="number" min="0" step="0.5" placeholder="0" /></label>
+              <label class="planner-day" for="hours-tue">Tue<input id="hours-tue" type="number" min="0" step="0.5" placeholder="0" /></label>
+              <label class="planner-day" for="hours-wed">Wed<input id="hours-wed" type="number" min="0" step="0.5" placeholder="0" /></label>
+              <label class="planner-day" for="hours-thu">Thu<input id="hours-thu" type="number" min="0" step="0.5" placeholder="0" /></label>
+              <label class="planner-day" for="hours-fri">Fri<input id="hours-fri" type="number" min="0" step="0.5" placeholder="0" /></label>
+              <label class="planner-day" for="hours-sat">Sat<input id="hours-sat" type="number" min="0" step="0.5" placeholder="0" /></label>
+              <label class="planner-day" for="hours-sun">Sun<input id="hours-sun" type="number" min="0" step="0.5" placeholder="0" /></label>
+            </div>
+          </section>
+
           <div class="actions">
             <button type="submit">Calculate Weighted TPH</button>
             <button type="button" id="estimate-time" class="secondary">Estimate Time Needed</button>
+            <button type="button" id="build-plan" class="secondary">Build Weekly Plan</button>
             <button type="button" id="reset" class="secondary">Reset</button>
           </div>
         </form>
@@ -60,6 +77,9 @@
         <div id="result" class="result" aria-live="polite">Your weighted TPH will appear here.</div>
         <div id="time-needed" class="result secondary-result" aria-live="polite">
           Time needed at 12 TPH will appear here.
+        </div>
+        <div id="plan-output" class="result secondary-result" aria-live="polite">
+          Weekly plan recommendations will appear here.
         </div>
 
         <section class="history" aria-labelledby="history-title">

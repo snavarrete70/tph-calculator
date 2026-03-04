@@ -4,6 +4,16 @@ const bucketDefinitions = [
   { id: "banking", label: "Banking" },
 ];
 
+const plannerDays = [
+  { id: "mon", label: "Mon" },
+  { id: "tue", label: "Tue" },
+  { id: "wed", label: "Wed" },
+  { id: "thu", label: "Thu" },
+  { id: "fri", label: "Fri" },
+  { id: "sat", label: "Sat" },
+  { id: "sun", label: "Sun" },
+];
+
 const workflowDefinitions = [
   { name: "Backlog CAP", minutes: 10, bucket: "identity" },
   { name: "Daily CAP", minutes: 10, bucket: "identity" },
@@ -31,6 +41,10 @@ const workflowDefinitions = [
 ];
 
 const targetTphPerHour = 12;
+const burnoutBufferRatio = 0.15;
+const maxBucketsPerDay = 2;
+const contextSwitchPenaltyMinutes = 20;
+
 const workflowWeights = workflowDefinitions.map((workflow) => (workflow.minutes * targetTphPerHour) / 60);
 const completedByWorkflow = workflowDefinitions.map(() => 0);
 
@@ -68,7 +82,10 @@ const resetButton = document.getElementById("reset");
 const historyBody = document.getElementById("history-body");
 const downloadCsvButton = document.getElementById("download-csv");
 let estimateTimeButton = document.getElementById("estimate-time");
+let buildPlanButton = document.getElementById("build-plan");
 let timeNeededBox = document.getElementById("time-needed");
+let planOutputBox = document.getElementById("plan-output");
+const dayHourInputs = plannerDays.map((day) => ({ ...day, input: document.getElementById(`hours-${day.id}`) }));
 const historyEntries = [];
 
 if (!estimateTimeButton) {
@@ -92,6 +109,15 @@ if (!timeNeededBox && resultBox?.parentNode) {
   resultBox.parentNode.insertBefore(timeNeededBox, resultBox.nextSibling);
 }
 
+if (!planOutputBox && resultBox?.parentNode) {
+  planOutputBox = document.createElement("div");
+  planOutputBox.id = "plan-output";
+  planOutputBox.className = "result secondary-result";
+  planOutputBox.setAttribute("aria-live", "polite");
+  planOutputBox.textContent = "Weekly plan recommendations will appear here.";
+  resultBox.parentNode.appendChild(planOutputBox);
+}
+
 function setResult(message, isError = false) {
   resultBox.textContent = message;
   resultBox.classList.toggle("error", isError);
@@ -103,6 +129,14 @@ function setTimeNeeded(message, isError = false) {
   }
   timeNeededBox.textContent = message;
   timeNeededBox.classList.toggle("error", isError);
+}
+
+function setPlanOutput(html, isError = false) {
+  if (!planOutputBox) {
+    return;
+  }
+  planOutputBox.innerHTML = html;
+  planOutputBox.classList.toggle("error", isError);
 }
 
 function toCsvValue(value) {
@@ -165,6 +199,146 @@ function getHoursWorked() {
     return { error: "Time values cannot be negative." };
   }
   return { hours: totalHours };
+}
+
+function getDayHours() {
+  const dayHours = [];
+
+  for (const day of dayHourInputs) {
+    if (!day.input) {
+      continue;
+    }
+
+    const rawValue = day.input.value;
+    const value = Number(rawValue || 0);
+
+    if (!Number.isFinite(value) || value < 0) {
+      return { error: `Invalid available hours for ${day.label}.` };
+    }
+
+    dayHours.push({ id: day.id, label: day.label, hours: value });
+  }
+
+  return { dayHours };
+}
+
+function getBucketLabel(bucketId) {
+  const bucket = bucketDefinitions.find((entry) => entry.id === bucketId);
+  return bucket ? bucket.label : bucketId;
+}
+
+function getRemainingMinutesForBucket(bucketId, remainingCases) {
+  let minutes = 0;
+
+  for (let index = 0; index < workflowDefinitions.length; index += 1) {
+    if (workflowDefinitions[index].bucket !== bucketId) {
+      continue;
+    }
+    minutes += remainingCases[index] * workflowDefinitions[index].minutes;
+  }
+
+  return minutes;
+}
+
+function pickNextBucket(remainingCases, excludeBuckets = []) {
+  let bestBucket = null;
+  let bestMinutes = 0;
+
+  for (const bucket of bucketDefinitions) {
+    if (excludeBuckets.includes(bucket.id)) {
+      continue;
+    }
+
+    const minutes = getRemainingMinutesForBucket(bucket.id, remainingCases);
+    if (minutes > bestMinutes) {
+      bestMinutes = minutes;
+      bestBucket = bucket.id;
+    }
+  }
+
+  return bestBucket;
+}
+
+function allocateFromBucket(bucketId, remainingCases, capacityMinutes) {
+  const allocation = {};
+  let usedMinutes = 0;
+  let capacityLeft = Math.max(0, Math.floor(capacityMinutes));
+
+  const bucketIndexes = workflowDefinitions
+    .map((workflow, index) => ({ workflow, index }))
+    .filter((entry) => entry.workflow.bucket === bucketId);
+
+  const primaryOrder = [...bucketIndexes].sort((a, b) => {
+    const scoreA = remainingCases[a.index] * a.workflow.minutes;
+    const scoreB = remainingCases[b.index] * b.workflow.minutes;
+    return scoreB - scoreA;
+  });
+
+  for (const entry of primaryOrder) {
+    const index = entry.index;
+    const minutesPerCase = entry.workflow.minutes;
+    const availableCases = remainingCases[index];
+
+    if (availableCases <= 0 || capacityLeft < minutesPerCase) {
+      continue;
+    }
+
+    const maxCases = Math.min(availableCases, Math.floor(capacityLeft / minutesPerCase));
+    if (maxCases <= 0) {
+      continue;
+    }
+
+    allocation[index] = (allocation[index] || 0) + maxCases;
+    remainingCases[index] -= maxCases;
+    const spent = maxCases * minutesPerCase;
+    capacityLeft -= spent;
+    usedMinutes += spent;
+  }
+
+  const fillOrder = [...bucketIndexes].sort((a, b) => a.workflow.minutes - b.workflow.minutes);
+
+  let filled = true;
+  while (filled) {
+    filled = false;
+
+    for (const entry of fillOrder) {
+      const index = entry.index;
+      const minutesPerCase = entry.workflow.minutes;
+
+      if (remainingCases[index] <= 0 || capacityLeft < minutesPerCase) {
+        continue;
+      }
+
+      allocation[index] = (allocation[index] || 0) + 1;
+      remainingCases[index] -= 1;
+      capacityLeft -= minutesPerCase;
+      usedMinutes += minutesPerCase;
+      filled = true;
+      break;
+    }
+  }
+
+  return { allocation, usedMinutes };
+}
+
+function summarizeDayAllocation(allocation) {
+  const entries = Object.entries(allocation)
+    .map(([index, count]) => ({
+      name: workflowDefinitions[Number(index)].name,
+      count,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  if (entries.length === 0) {
+    return "No cases planned";
+  }
+
+  const topEntries = entries.slice(0, 3).map((entry) => `${entry.name} x${entry.count}`);
+  if (entries.length > 3) {
+    topEntries.push(`+${entries.length - 3} more workflows`);
+  }
+
+  return topEntries.join(" | ");
 }
 
 function renderRowsForBucket(bucketId) {
@@ -273,6 +447,152 @@ function renderTimeNeeded(totals) {
   );
 }
 
+function buildWeeklyPlan() {
+  const totals = calculateTotals();
+  if (totals.error) {
+    setPlanOutput(totals.error, true);
+    return;
+  }
+
+  if (totals.rawTasks <= 0) {
+    setPlanOutput("Enter assigned case counts before building a weekly plan.", true);
+    return;
+  }
+
+  const dayHoursResult = getDayHours();
+  if (dayHoursResult.error) {
+    setPlanOutput(dayHoursResult.error, true);
+    return;
+  }
+
+  const dayHours = dayHoursResult.dayHours;
+  const totalAvailableHours = dayHours.reduce((sum, day) => sum + day.hours, 0);
+
+  if (totalAvailableHours <= 0) {
+    setPlanOutput("Enter available hours for at least one day to build a plan.", true);
+    return;
+  }
+
+  const remainingCases = completedByWorkflow.map((value) => Number(value || 0));
+  const dayPlans = [];
+
+  for (const day of dayHours) {
+    const dailyCapacityMinutes = day.hours * 60 * (1 - burnoutBufferRatio);
+    let minutesUsed = 0;
+    let switchPenaltyApplied = 0;
+    const bucketFocus = [];
+    const allocation = {};
+
+    for (let slot = 0; slot < maxBucketsPerDay; slot += 1) {
+      const bucketId = pickNextBucket(remainingCases, bucketFocus);
+      if (!bucketId) {
+        break;
+      }
+
+      if (slot > 0) {
+        if (dailyCapacityMinutes - minutesUsed <= contextSwitchPenaltyMinutes) {
+          break;
+        }
+        minutesUsed += contextSwitchPenaltyMinutes;
+        switchPenaltyApplied += contextSwitchPenaltyMinutes;
+      }
+
+      const capacityForCases = dailyCapacityMinutes - minutesUsed;
+      if (capacityForCases <= 0) {
+        break;
+      }
+
+      const allocationResult = allocateFromBucket(bucketId, remainingCases, capacityForCases);
+      if (allocationResult.usedMinutes <= 0) {
+        if (slot > 0) {
+          minutesUsed -= contextSwitchPenaltyMinutes;
+          switchPenaltyApplied -= contextSwitchPenaltyMinutes;
+        }
+        break;
+      }
+
+      bucketFocus.push(bucketId);
+      minutesUsed += allocationResult.usedMinutes;
+
+      for (const [index, count] of Object.entries(allocationResult.allocation)) {
+        allocation[index] = (allocation[index] || 0) + count;
+      }
+    }
+
+    const plannedCases = Object.values(allocation).reduce((sum, count) => sum + count, 0);
+    const utilization = day.hours > 0 ? (minutesUsed / (day.hours * 60)) * 100 : 0;
+
+    dayPlans.push({
+      ...day,
+      minutesUsed,
+      plannedCases,
+      utilization,
+      switchPenaltyApplied,
+      bucketFocus,
+      allocation,
+    });
+  }
+
+  const remainingTaskCount = remainingCases.reduce((sum, count) => sum + count, 0);
+  const remainingMinutes = remainingCases.reduce(
+    (sum, count, index) => sum + count * workflowDefinitions[index].minutes,
+    0,
+  );
+
+  const requiredHours = totals.weightedUnits / targetTphPerHour;
+  const effectiveCapacityHours = totalAvailableHours * (1 - burnoutBufferRatio);
+
+  const statusLine =
+    remainingTaskCount > 0
+      ? `<strong>Plan status:</strong> ${remainingTaskCount} cases (${formatNumber(remainingMinutes / 60)} hours) remain after this week's safe-capacity plan.`
+      : "<strong>Plan status:</strong> All assigned cases can be completed within this week's plan.";
+
+  const rows = dayPlans
+    .map((day) => {
+      const focusText =
+        day.bucketFocus.length > 0
+          ? day.bucketFocus.map((bucketId) => getBucketLabel(bucketId)).join(" + ")
+          : "Recovery / Admin";
+
+      return `<tr>
+        <td>${day.label}</td>
+        <td>${focusText}</td>
+        <td>${day.plannedCases}</td>
+        <td>${formatHoursMinutes(day.minutesUsed / 60)}</td>
+        <td>${formatNumber(day.utilization)}%</td>
+        <td>${summarizeDayAllocation(day.allocation)}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const summaryHtml = `
+    <div class="plan-summary">
+      <p><strong>Required time:</strong> ${formatHoursMinutes(requiredHours)} (${formatNumber(requiredHours)} hours)</p>
+      <p><strong>Available time entered:</strong> ${formatNumber(totalAvailableHours)} hours</p>
+      <p><strong>Planning capacity (15% burnout buffer):</strong> ${formatNumber(effectiveCapacityHours)} hours</p>
+      <p>${statusLine}</p>
+    </div>
+    <div class="table-wrap plan-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Day</th>
+            <th>Primary Focus</th>
+            <th>Cases Planned</th>
+            <th>Planned Work Time</th>
+            <th>Utilization</th>
+            <th>Workflow Mix</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <p class="planner-footnote">Planner logic: keeps a 15% daily buffer for burnout prevention and limits each day to at most 2 buckets with a context-switch penalty.</p>
+  `;
+
+  setPlanOutput(summaryHtml, remainingTaskCount > 0);
+}
+
 downloadCsvButton.addEventListener("click", () => {
   if (historyEntries.length === 0) {
     return;
@@ -308,6 +628,12 @@ if (estimateTimeButton) {
       return;
     }
     renderTimeNeeded(totals);
+  });
+}
+
+if (buildPlanButton) {
+  buildPlanButton.addEventListener("click", () => {
+    buildWeeklyPlan();
   });
 }
 
@@ -394,9 +720,16 @@ resetButton.addEventListener("click", () => {
     completedByWorkflow[index] = 0;
   }
 
+  for (const day of dayHourInputs) {
+    if (day.input) {
+      day.input.value = "";
+    }
+  }
+
   renderWorkflowSections();
   setResult("Your weighted TPH will appear here.");
   setTimeNeeded(`Time needed at ${targetTphPerHour} TPH will appear here.`);
+  setPlanOutput("Weekly plan recommendations will appear here.");
   hoursPartInput.focus();
 });
 

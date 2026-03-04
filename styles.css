@@ -170,6 +170,44 @@ select:focus {
   content: "-";
 }
 
+.planner-section {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fbff;
+}
+
+.planner-section h2 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.planner-note {
+  margin: 6px 0 10px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.planner-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.planner-day {
+  display: grid;
+  gap: 4px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #2f4061;
+}
+
+.planner-day input {
+  padding: 6px 8px;
+  font-size: 0.88rem;
+}
+
 .table-wrap {
   border: 0;
   border-radius: 0;
@@ -177,7 +215,8 @@ select:focus {
   background: transparent;
 }
 
-.history .table-wrap {
+.history .table-wrap,
+.plan-table-wrap {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #fbfcff;
@@ -267,6 +306,22 @@ button:disabled {
   font-size: 1rem;
 }
 
+.secondary-result {
+  margin-top: 8px;
+  background: #f3f9f8;
+}
+
+.plan-summary p {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+}
+
+.planner-footnote {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .error {
   color: var(--danger);
   border-color: #fecaca;
@@ -330,14 +385,13 @@ button:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .planner-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   #time-total-minutes input,
   #time-total-hours input,
   .small-input {
     max-width: none;
   }
-}
-
-.secondary-result {
-  margin-top: 8px;
-  background: #f3f9f8;
 }
