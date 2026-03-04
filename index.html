@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Foundations TPH Calculator</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=20260304a" />
   </head>
   <body>
     <main class="container">
@@ -53,7 +53,7 @@
           <section class="planner-section" aria-labelledby="planner-title">
             <h2 id="planner-title">Weekly Planning Assistant</h2>
             <p class="planner-note">
-              Enter available hours per day. Planner uses your current workflow case counts as assigned load.
+              Enter available hours per day and the exact Daily CAP/Wires assignments by day.
             </p>
             <div class="planner-grid">
               <label class="planner-day" for="hours-mon">Mon<input id="hours-mon" type="number" min="0" step="0.5" placeholder="0" /></label>
@@ -63,6 +63,26 @@
               <label class="planner-day" for="hours-fri">Fri<input id="hours-fri" type="number" min="0" step="0.5" placeholder="0" /></label>
               <label class="planner-day" for="hours-sat">Sat<input id="hours-sat" type="number" min="0" step="0.5" placeholder="0" /></label>
               <label class="planner-day" for="hours-sun">Sun<input id="hours-sun" type="number" min="0" step="0.5" placeholder="0" /></label>
+            </div>
+            <h3 class="planner-subtitle">Daily CAP Assignments</h3>
+            <div class="planner-grid">
+              <label class="planner-day" for="cap-mon">Mon<input id="cap-mon" type="number" min="0" step="1" placeholder="0" /></label>
+              <label class="planner-day" for="cap-tue">Tue<input id="cap-tue" type="number" min="0" step="1" placeholder="0" /></label>
+              <label class="planner-day" for="cap-wed">Wed<input id="cap-wed" type="number" min="0" step="1" placeholder="0" /></label>
+              <label class="planner-day" for="cap-thu">Thu<input id="cap-thu" type="number" min="0" step="1" placeholder="0" /></label>
+              <label class="planner-day" for="cap-fri">Fri<input id="cap-fri" type="number" min="0" step="1" placeholder="0" /></label>
+              <label class="planner-day" for="cap-sat">Sat<input id="cap-sat" type="number" min="0" step="1" placeholder="0" /></label>
+              <label class="planner-day" for="cap-sun">Sun<input id="cap-sun" type="number" min="0" step="1" placeholder="0" /></label>
+            </div>
+            <h3 class="planner-subtitle">Wires Assignments</h3>
+            <div class="planner-grid">
+              <label class="planner-day" for="wires-mon">Mon<input id="wires-mon" type="number" min="0" step="1" placeholder="0" /></label>
+              <label class="planner-day" for="wires-tue">Tue<input id="wires-tue" type="number" min="0" step="1" placeholder="0" /></label>
+              <label class="planner-day" for="wires-wed">Wed<input id="wires-wed" type="number" min="0" step="1" placeholder="0" /></label>
+              <label class="planner-day" for="wires-thu">Thu<input id="wires-thu" type="number" min="0" step="1" placeholder="0" /></label>
+              <label class="planner-day" for="wires-fri">Fri<input id="wires-fri" type="number" min="0" step="1" placeholder="0" /></label>
+              <label class="planner-day" for="wires-sat">Sat<input id="wires-sat" type="number" min="0" step="1" placeholder="0" /></label>
+              <label class="planner-day" for="wires-sun">Sun<input id="wires-sun" type="number" min="0" step="1" placeholder="0" /></label>
             </div>
           </section>
 
@@ -112,6 +132,6 @@
       </section>
     </main>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=20260304a"></script>
   </body>
 </html>

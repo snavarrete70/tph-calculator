@@ -87,6 +87,8 @@ let buildPlanButton = document.getElementById("build-plan");
 let timeNeededBox = document.getElementById("time-needed");
 let planOutputBox = document.getElementById("plan-output");
 const dayHourInputs = plannerDays.map((day) => ({ ...day, input: document.getElementById(`hours-${day.id}`) }));
+const dailyCapInputs = plannerDays.map((day) => ({ ...day, input: document.getElementById(`cap-${day.id}`) }));
+const dailyWiresInputs = plannerDays.map((day) => ({ ...day, input: document.getElementById(`wires-${day.id}`) }));
 const historyEntries = [];
 
 if (!estimateTimeButton) {
@@ -223,6 +225,27 @@ function getDayHours() {
   return { dayHours };
 }
 
+function getDailyCases(dayInputs, label) {
+  const dayCases = [];
+
+  for (const day of dayInputs) {
+    if (!day.input) {
+      continue;
+    }
+
+    const rawValue = day.input.value;
+    const value = Number(rawValue || 0);
+
+    if (!Number.isFinite(value) || value < 0 || !Number.isInteger(value)) {
+      return { error: `Invalid ${label} assignments for ${day.label}. Use whole numbers.` };
+    }
+
+    dayCases.push({ id: day.id, label: day.label, cases: value });
+  }
+
+  return { dayCases };
+}
+
 function getBucketLabel(bucketId) {
   const bucket = bucketDefinitions.find((entry) => entry.id === bucketId);
   return bucket ? bucket.label : bucketId;
@@ -286,6 +309,27 @@ function allocateRequiredCasesForWorkflow(index, requiredCases, remainingCases, 
   }
 
   remainingCases[index] -= casesToAllocate;
+  allocation[index] = (allocation[index] || 0) + casesToAllocate;
+  minutesUsedRef.value += casesToAllocate * minutesPerCase;
+  return casesToAllocate;
+}
+
+function allocateFixedCasesForDay(index, requiredCases, allocation, minutesUsedRef, capacityMinutes, bucketFocus) {
+  const minutesPerCase = workflowDefinitions[index].minutes;
+  const bucketId = workflowDefinitions[index].bucket;
+
+  if (!ensureBucketFocus(bucketFocus, bucketId, minutesUsedRef, capacityMinutes)) {
+    return 0;
+  }
+
+  const capacityLeft = Math.max(0, Math.floor(capacityMinutes - minutesUsedRef.value));
+  const maxByCapacity = Math.floor(capacityLeft / minutesPerCase);
+  const casesToAllocate = Math.min(requiredCases, maxByCapacity);
+
+  if (casesToAllocate <= 0) {
+    return 0;
+  }
+
   allocation[index] = (allocation[index] || 0) + casesToAllocate;
   minutesUsedRef.value += casesToAllocate * minutesPerCase;
   return casesToAllocate;
@@ -397,12 +441,7 @@ function summarizeDayAllocation(allocation) {
     return "No cases planned";
   }
 
-  const topEntries = entries.slice(0, 3).map((entry) => `${entry.name} x${entry.count}`);
-  if (entries.length > 3) {
-    topEntries.push(`+${entries.length - 3} more workflows`);
-  }
-
-  return topEntries.join(" | ");
+  return entries.map((entry) => `${entry.name} x${entry.count}`).join(" | ");
 }
 
 function renderRowsForBucket(bucketId) {
@@ -518,11 +557,6 @@ function buildWeeklyPlan() {
     return;
   }
 
-  if (totals.rawTasks <= 0) {
-    setPlanOutput("Enter assigned case counts before building a weekly plan.", true);
-    return;
-  }
-
   const dayHoursResult = getDayHours();
   if (dayHoursResult.error) {
     setPlanOutput(dayHoursResult.error, true);
@@ -537,18 +571,50 @@ function buildWeeklyPlan() {
     return;
   }
 
-  const dailyDueIndexes = workflowDefinitions
-    .map((workflow, index) => ({ workflow, index }))
-    .filter((entry) => isDailyPortionWorkflow(entry.workflow.name))
-    .map((entry) => entry.index);
+  const capDailyResult = getDailyCases(dailyCapInputs, "Daily CAP");
+  if (capDailyResult.error) {
+    setPlanOutput(capDailyResult.error, true);
+    return;
+  }
+
+  const wiresDailyResult = getDailyCases(dailyWiresInputs, "Wires");
+  if (wiresDailyResult.error) {
+    setPlanOutput(wiresDailyResult.error, true);
+    return;
+  }
+
+  const dailyCapIndex = workflowDefinitions.findIndex((workflow) => workflow.name === "Daily CAP");
+  const wiresIndex = workflowDefinitions.findIndex((workflow) => workflow.name === "Wires");
+
+  const planningCases = completedByWorkflow.map((value) => Number(value || 0));
+  if (dailyCapIndex >= 0) {
+    planningCases[dailyCapIndex] = capDailyResult.dayCases.reduce((sum, day) => sum + day.cases, 0);
+  }
+  if (wiresIndex >= 0) {
+    planningCases[wiresIndex] = wiresDailyResult.dayCases.reduce((sum, day) => sum + day.cases, 0);
+  }
+
+  const plannedAssignedCases = planningCases.reduce((sum, count) => sum + count, 0);
+  if (plannedAssignedCases <= 0) {
+    setPlanOutput("Enter assigned case counts before building a weekly plan.", true);
+    return;
+  }
 
   const wednesdayDueIndexes = workflowDefinitions
     .map((workflow, index) => ({ workflow, index }))
     .filter((entry) => isWednesdayDueWorkflow(entry.workflow.name))
     .map((entry) => entry.index);
 
-  const remainingCases = completedByWorkflow.map((value) => Number(value || 0));
+  const remainingCases = [...planningCases];
+  if (dailyCapIndex >= 0) {
+    remainingCases[dailyCapIndex] = 0;
+  }
+  if (wiresIndex >= 0) {
+    remainingCases[wiresIndex] = 0;
+  }
+
   const dayPlans = [];
+  const missedDailyAssignments = [];
 
   for (let dayIndex = 0; dayIndex < dayHours.length; dayIndex += 1) {
     const day = dayHours[dayIndex];
@@ -557,44 +623,50 @@ function buildWeeklyPlan() {
     const bucketFocus = [];
     const allocation = {};
 
-    if (day.hours > 0) {
-      const remainingActiveDays = countActiveDays(dayHours, dayIndex, dayHours.length - 1);
-      if (remainingActiveDays > 0) {
-        for (const index of dailyDueIndexes) {
+    const fixedAssignments = [];
+    if (dailyCapIndex >= 0) {
+      fixedAssignments.push({ index: dailyCapIndex, cases: capDailyResult.dayCases[dayIndex]?.cases || 0 });
+    }
+    if (wiresIndex >= 0) {
+      fixedAssignments.push({ index: wiresIndex, cases: wiresDailyResult.dayCases[dayIndex]?.cases || 0 });
+    }
+
+    for (const assignment of fixedAssignments) {
+      if (assignment.cases <= 0) {
+        continue;
+      }
+      const allocated = allocateFixedCasesForDay(
+        assignment.index,
+        assignment.cases,
+        allocation,
+        minutesUsedRef,
+        dailyCapacityMinutes,
+        bucketFocus,
+      );
+      if (allocated < assignment.cases) {
+        missedDailyAssignments.push(
+          `${day.label} ${workflowDefinitions[assignment.index].name}: ${assignment.cases - allocated} not planned`,
+        );
+      }
+    }
+
+    if (day.hours > 0 && dayIndex <= wednesdayIndex) {
+      const remainingWedDays = countActiveDays(dayHours, dayIndex, wednesdayIndex);
+      if (remainingWedDays > 0) {
+        for (const index of wednesdayDueIndexes) {
           if (remainingCases[index] <= 0) {
             continue;
           }
-          const dailyQuota = Math.ceil(remainingCases[index] / remainingActiveDays);
+          const wedQuota = Math.ceil(remainingCases[index] / remainingWedDays);
           allocateRequiredCasesForWorkflow(
             index,
-            dailyQuota,
+            wedQuota,
             remainingCases,
             allocation,
             minutesUsedRef,
             dailyCapacityMinutes,
             bucketFocus,
           );
-        }
-      }
-
-      if (dayIndex <= wednesdayIndex) {
-        const remainingWedDays = countActiveDays(dayHours, dayIndex, wednesdayIndex);
-        if (remainingWedDays > 0) {
-          for (const index of wednesdayDueIndexes) {
-            if (remainingCases[index] <= 0) {
-              continue;
-            }
-            const wedQuota = Math.ceil(remainingCases[index] / remainingWedDays);
-            allocateRequiredCasesForWorkflow(
-              index,
-              wedQuota,
-              remainingCases,
-              allocation,
-              minutesUsedRef,
-              dailyCapacityMinutes,
-              bucketFocus,
-            );
-          }
         }
       }
     }
@@ -644,10 +716,13 @@ function buildWeeklyPlan() {
     (sum, count, index) => sum + count * workflowDefinitions[index].minutes,
     0,
   );
-  const remainingDailyDue = dailyDueIndexes.reduce((sum, index) => sum + remainingCases[index], 0);
   const remainingWednesdayDue = wednesdayDueIndexes.reduce((sum, index) => sum + remainingCases[index], 0);
 
-  const requiredHours = totals.weightedUnits / targetTphPerHour;
+  const requiredWeightedUnits = planningCases.reduce(
+    (sum, count, index) => sum + count * workflowWeights[index],
+    0,
+  );
+  const requiredHours = requiredWeightedUnits / targetTphPerHour;
   const effectiveCapacityHours = totalAvailableHours * (1 - burnoutBufferRatio);
 
   let statusLine =
@@ -659,8 +734,8 @@ function buildWeeklyPlan() {
     statusLine += ` <br /><strong>Deadline risk:</strong> ${remainingWednesdayDue} secondary cases remain beyond Wednesday.`;
   }
 
-  if (remainingDailyDue > 0) {
-    statusLine += ` <br /><strong>Daily portion risk:</strong> ${remainingDailyDue} Daily CAP/Wires cases remain after daily planning.`;
+  if (missedDailyAssignments.length > 0) {
+    statusLine += ` <br /><strong>Day-specific CAP/Wires risk:</strong> ${missedDailyAssignments.join("; ")}.`;
   }
 
   const rows = dayPlans
@@ -703,11 +778,11 @@ function buildWeeklyPlan() {
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <p class="planner-footnote">Planner logic: Daily CAP and Wires are allocated as daily portions first, workflows ending in "Secondaries" are due by Wednesday, then remaining work is optimized. Planner keeps a 15% daily buffer and limits to at most 2 buckets/day.</p>
   `;
 
-  setPlanOutput(summaryHtml, remainingTaskCount > 0 || remainingWednesdayDue > 0 || remainingDailyDue > 0);
+  setPlanOutput(summaryHtml, remainingTaskCount > 0 || remainingWednesdayDue > 0 || missedDailyAssignments.length > 0);
 }
+
 downloadCsvButton.addEventListener("click", () => {
   if (historyEntries.length === 0) {
     return;
@@ -836,6 +911,16 @@ resetButton.addEventListener("click", () => {
   }
 
   for (const day of dayHourInputs) {
+    if (day.input) {
+      day.input.value = "";
+    }
+  }
+  for (const day of dailyCapInputs) {
+    if (day.input) {
+      day.input.value = "";
+    }
+  }
+  for (const day of dailyWiresInputs) {
     if (day.input) {
       day.input.value = "";
     }
